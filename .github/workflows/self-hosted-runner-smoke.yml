@@ -1,0 +1,105 @@
+name: BridgeX Self-hosted Runner Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bridgex-self-hosted-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self_hosted_runner_smoke:
+    name: BridgeX self-hosted runner smoke
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - tnsuite-ci
+      - bridgex
+      - ci-v1
+      - no-prod
+    steps:
+      - name: Verify isolated runner identity and boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(hostname -s)" = "tn-ci-01"
+          test "$(id -un)" = "tnci-bridgex"
+          test "${RUNNER_NAME:-}" = "tn-ci-01-bridgex"
+          test "${TNSUITE_CI_PROJECT_KEY:-}" = "bridgex"
+
+          case "$GITHUB_WORKSPACE" in
+            /opt/tnsuite-ci/runners/bridgex/_work/*) ;;
+            *)
+              echo "RUNNER_WORKSPACE_BOUNDARY=FAIL workspace=$GITHUB_WORKSPACE" >&2
+              exit 1
+              ;;
+          esac
+
+          bad_groups="$(id -nG | tr ' ' '\n' | grep -E '^(sudo|docker|www-data|root)$' || true)"
+          test -z "$bad_groups" || {
+            echo "RUNNER_PRIVILEGE_BOUNDARY=FAIL groups=$bad_groups" >&2
+            exit 1
+          }
+
+          test "${ACTIONS_RUNNER_HOOK_JOB_STARTED:-}" = "/opt/tnsuite-ci/hooks/job-start.sh"
+          test "${ACTIONS_RUNNER_HOOK_JOB_COMPLETED:-}" = "/opt/tnsuite-ci/hooks/job-completed.sh"
+          test "${HOME:-}" = "/var/lib/tnsuite-ci/home/bridgex"
+          test "${TMPDIR:-}" = "/var/lib/tnsuite-ci/tmp/bridgex"
+          test "${XDG_CACHE_HOME:-}" = "/var/cache/tnsuite-ci/bridgex"
+
+          echo "RUNNER_ROUTING=PASS"
+          echo "RUNNER_IDENTITY=PASS"
+          echo "RUNNER_WORKSPACE_BOUNDARY=PASS"
+          echo "RUNNER_PRIVILEGE_BOUNDARY=PASS"
+          echo "LIFECYCLE_HOOK_BINDING=PASS"
+          echo "PRODUCTION_ACCESS=NONE"
+          echo "DATABASE_EXECUTION=NOT_PERFORMED"
+
+      - name: Create post-job cleanup sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE"
+          printf '%s\n' "${GITHUB_RUN_ID}:${GITHUB_JOB}" > "$GITHUB_WORKSPACE/.tnsuite-bridgex-runner-smoke-sentinel"
+          test -f "$GITHUB_WORKSPACE/.tnsuite-bridgex-runner-smoke-sentinel"
+          echo "POST_JOB_SENTINEL_CREATED=PASS"
+
+  post_job_cleanup_proof:
+    name: BridgeX post-job workspace cleanup proof
+    needs: self_hosted_runner_smoke
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - tnsuite-ci
+      - bridgex
+      - ci-v1
+      - no-prod
+    steps:
+      - name: Prove previous workspace was cleaned
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(hostname -s)" = "tn-ci-01"
+          test "$(id -un)" = "tnci-bridgex"
+          test "${RUNNER_NAME:-}" = "tn-ci-01-bridgex"
+          test "${TNSUITE_CI_PROJECT_KEY:-}" = "bridgex"
+
+          sentinel="$GITHUB_WORKSPACE/.tnsuite-bridgex-runner-smoke-sentinel"
+          if test -e "$sentinel"; then
+            echo "POST_JOB_WORKSPACE_CLEANUP=FAIL sentinel=$sentinel" >&2
+            exit 1
+          fi
+
+          echo "POST_JOB_WORKSPACE_CLEANUP=PASS"
+          echo "SELF_HOSTED_RUNNER_SMOKE=PASS"
+          echo "PRODUCTION_ACCESS=NONE"
+          echo "DATABASE_EXECUTION=NOT_PERFORMED"
