@@ -1,0 +1,8 @@
+{
+  "schema": "tnsuite.release-contract.v1",
+  "project": {"key":"bridgex","source_repository":"kyousuke33/TNSuite-BridgeX","source_branch":"main"},
+  "control_plane": {"managed":true,"auto_staging":false,"auto_production":false},
+  "artifact": {"strategy":"immutable","rebuild_between_environments":false},
+  "hooks": {"source_gates":".release/source-gates.sh","runtime_doctor":".release/runtime-doctor.sh","staging_acceptance":".release/staging-acceptance.sh","production_acceptance":".release/production-acceptance.sh"},
+  "capabilities": {"database_migrations":false,"service_restart":false,"background_workers":false}
+}

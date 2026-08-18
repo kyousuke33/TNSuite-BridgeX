@@ -1,0 +1,24 @@
+name: BridgeX Governance Gates
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required governed structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f AGENTS.md
+          test -f docs/90_GOVERNANCE/CURRENT_STATE.md
+          test -f .release/project.json
+          test -f .release/source-gates.sh
+          test -f skills/project-audit/SKILL.md
+          echo GOVERNANCE_STRUCTURE_QA=PASS
+      - name: Source gate
+        run: bash .release/source-gates.sh
