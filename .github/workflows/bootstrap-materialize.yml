@@ -2,6 +2,8 @@ name: Materialize BridgeX bootstrap
 on:
   push:
     branches: [agent/governed-desktop-bootstrap]
+  pull_request:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -13,6 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: agent/governed-desktop-bootstrap
       - name: Reconstruct canonical source
         shell: bash
         run: |
