@@ -17,7 +17,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .bootstrap/payload.part* | base64 -d > /tmp/bridgex-bootstrap.tar.xz
+          cat .bootstrap/source.part* | base64 -d > /tmp/bridgex-bootstrap.tar.xz
+          tar -tJf /tmp/bridgex-bootstrap.tar.xz
           tar -xJf /tmp/bridgex-bootstrap.tar.xz -C .
           rm -rf .bootstrap
           rm -f .github/workflows/bootstrap-materialize.yml
