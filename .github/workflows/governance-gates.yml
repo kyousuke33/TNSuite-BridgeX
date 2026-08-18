@@ -7,7 +7,14 @@ permissions:
   contents: read
 jobs:
   governance:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - tnsuite-ci
+      - bridgex
+      - ci-v1
+      - no-prod
     steps:
       - uses: actions/checkout@v4
       - name: Required governed structure
