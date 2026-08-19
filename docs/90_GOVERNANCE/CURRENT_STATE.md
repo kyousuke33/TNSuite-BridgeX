@@ -13,13 +13,25 @@ PUBLIC_REPOSITORY=CONFIRMED
 CANONICAL_SOURCE=PR_3_EXACT_BASELINE_IMPORTED_MERGE_PENDING
 SOURCE_BASELINE_MANIFEST=PASS
 SOURCE_REGRESSION_QA=PASS
+RCP_PUBLIC_CI_AUTHORITY=tnsuite.ci-public-repository-trust.v1
+RCP_PUBLIC_CI_AUTHORITY_SHA=d65902e04406e088c29ee09cc64611179e66e754
 CI_RUNNER=GITHUB_HOSTED
+SHARED_SELF_HOSTED_CI=PROHIBITED
+UNTRUSTED_PR_RUNNER=GITHUB_HOSTED_ONLY
 PUBLIC_PR_SELF_HOSTED_EXECUTION=NONE
 FORK_PR_RUNNER=GITHUB_HOSTED
 PULL_REQUEST_TARGET_UNTRUSTED_EXECUTION=NONE
 CI_SECRET_EXPOSURE=NONE_FROM_REPOSITORY_WORKFLOWS
+TN_CI_01_ACCESS=NONE
 TN_CI_01_WORKFLOW_ROUTING=NONE
-SHARED_TN_CI_01_RUNNER=REMOVAL_PENDING
+SHARED_TN_CI_01_RUNNER=NOT_REGISTERED
+TN_CI_01_BRIDGEX_SERVICE=ABSENT
+TN_CI_01_BRIDGEX_CREDENTIALS=ABSENT
+TN_CI_01_BRIDGEX_WORKSPACE=ABSENT
+TN_CI_01_BRIDGEX_UNIX_IDENTITY=ABSENT
+MAIN_PROTECTION=ENABLED
+REQUIRED_CI_CHECKS=ENABLED
+RULESET_BYPASS=NONE
 PRODUCTION_ACCESS=NONE
 DATABASE_EXECUTION=NOT_PERFORMED
 WINDOWS_COMPILE_QA=NOT_RUN_FOR_BOOTSTRAP_PR
@@ -36,7 +48,9 @@ DATABASE=NOT_APPLICABLE
 WEB_HEALTH=NOT_APPLICABLE
 ```
 
-BridgeX is public. Repository PR/source CI is routed only to GitHub-hosted infrastructure and is governed by the central RCP contract `tnsuite.ci-public-repository-trust.v1`. The previously configured shared `tn-ci-01-bridgex` runner is no longer an allowed execution target and remains `REMOVAL_PENDING` until GitHub registration and host-side runner configuration are independently removed and verified.
+BridgeX is public. Repository PR/source CI is routed only to GitHub-hosted infrastructure and is governed by canonical RCP contract `tnsuite.ci-public-repository-trust.v1` at RCP merge SHA `d65902e04406e088c29ee09cc64611179e66e754`. The previously configured shared `tn-ci-01-bridgex` runner has been removed from GitHub and its bounded host-side service, credentials, workspace, home/tmp/cache state and Unix identity have been removed from `tn-ci-01`.
+
+Repository owner confirmed the public governed main ruleset with no bypass actors is active. Required `governance` remains strict; public contributor code is not permitted to execute on shared TNSuite self-hosted infrastructure.
 
 The bootstrap PR proves canonical source integrity and governed source/static regression gates. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
 
