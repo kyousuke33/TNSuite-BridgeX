@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TNSuite BridgeX — Report a bug</title>
+<style>
+:root{color-scheme:light dark;font-family:Segoe UI,Arial,sans-serif}body{max-width:920px;margin:40px auto;padding:0 24px;line-height:1.55}h1,h2{line-height:1.2}code,pre{font-family:Cascadia Mono,Consolas,monospace}pre{padding:14px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:8px;overflow:auto}</style>
+</head>
+<body>
+<h1>BridgeX diagnostic checklist</h1>
+<p>Before reporting a BridgeX-specific issue, collect the information below. Never include passwords or private-key contents.</p>
+<h2>1. Version</h2>
+<p>Open <strong>Help → About</strong> and note the BridgeX build number and FileZilla core version.</p>
+<h2>2. CLI runtime</h2>
+<pre>BridgeX-CLI.exe --selftest --json
+BridgeX-CLI.exe doctor --json</pre>
+<h2>3. Reproduction</h2>
+<p>Record the exact action, expected result, actual result, and whether the issue occurs in Light mode, Dark mode, or both.</p>
+<h2>4. Transfer issue</h2>
+<p>Include protocol (FTP/FTPS/SFTP), server port, and the non-secret status/error messages shown by BridgeX. Redact hostnames/IPs when necessary.</p>
+<h2>5. Privacy</h2>
+<p>Do <strong>not</strong> attach private keys, passwords, access tokens, session secrets, or production credentials.</p>
+<p>This checklist is for TNSuite BridgeX. Upstream FileZilla support channels are not used for BridgeX-specific modifications.</p>
+</body>
+</html>

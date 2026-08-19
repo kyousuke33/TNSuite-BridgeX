@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TNSuite BridgeX Help</title>
+<style>
+:root{color-scheme:light dark;font-family:Segoe UI,Arial,sans-serif}body{max-width:920px;margin:40px auto;padding:0 24px;line-height:1.55}h1,h2{line-height:1.2}code,pre{font-family:Cascadia Mono,Consolas,monospace}pre{padding:14px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:8px;overflow:auto}.note{padding:12px 14px;border-left:4px solid #45c7ff;background:color-mix(in srgb,#45c7ff 8%,transparent)}</style>
+</head>
+<body>
+<h1>TNSuite BridgeX</h1>
+<p><strong>Secure Transfer &amp; Automation</strong></p>
+<p>BridgeX combines a desktop FTP/FTPS/SFTP transfer client with an independent SFTP automation CLI.</p>
+<h2>Connect</h2>
+<p>Use <strong>Sites</strong> for reusable connections. Use the connection strip for a one-off session. SFTP uses port 22 unless the server is configured differently.</p>
+<h2>Transfer files</h2>
+<p>The left pane is local storage and the right pane is the remote server. Drag files between panes or use the context menu. The transfer queue at the bottom shows active, failed and successful transfers.</p>
+<h2>Automation CLI</h2>
+<p>Open <strong>Automation → Open BridgeX CLI</strong>, then run:</p>
+<pre>BridgeX-CLI.exe --help
+BridgeX-CLI.exe doctor --json</pre>
+<p>Site profiles store host, user, port and key path only. Password storage is not supported by the BridgeX CLI.</p>
+<h2>Appearance &amp; language</h2>
+<p>Open <strong>Settings → Interface</strong>. BridgeX supports <strong>English</strong> and <strong>Vietnamese</strong>, plus <strong>Light</strong> and <strong>Dark</strong> themes. Restart BridgeX after changing either setting.</p>
+<h2>Security</h2>
+<div class="note">Host-key checking is strict by default in BridgeX CLI. Do not disable host-key verification for production systems.</div>
+<h2>Upstream attribution</h2>
+<p>The BridgeX GUI is based on FileZilla Client open-source code. Upstream copyright and license information remains available from the About dialog.</p>
+</body>
+</html>

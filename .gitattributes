@@ -5,9 +5,13 @@
 *.json text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
-*.ps1 text eol=crlf
-*.cmd text eol=crlf
-*.nsi text eol=crlf
+*.ps1 text eol=lf
+*.cmd text eol=lf
+*.nsi text eol=lf
+*.cpp text eol=lf
+*.html text eol=lf
+*.po text eol=lf
+*.patch text eol=lf
 *.png binary
 *.ico binary
 *.bmp binary
