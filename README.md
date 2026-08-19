@@ -21,14 +21,15 @@ Bản cài đặt chính thức sẽ được phát hành tại:
 
 Hiện repository chưa publish binary release đầu tiên. Baseline phát triển hiện tại là **v0.5 Build12-Hotfix16**.
 
-Khi một bản release được phát hành, trang release sẽ kèm:
+Khi có release, mỗi file tải sẽ kèm thông tin kiểm tra ngay trên trang phát hành, ví dụ:
 
-- file cài đặt Windows;
-- bản portable nếu có;
-- mã **SHA-256** để đối chiếu file;
-- link **VirusTotal** của đúng file phát hành để người dùng có thể kiểm tra nhanh trước khi cài.
+```text
+TNSuiteBridgeX-vX.X.X-Setup.exe
+SHA-256: ...
+VirusTotal: Xem kết quả quét
+```
 
-> Chỉ nên tải BridgeX từ trang Releases của repository này. Link VirusTotal sẽ được gắn theo từng release artifact thực tế, không dùng một badge “safe” chung cho mọi phiên bản.
+Bản portable `.zip` cũng sẽ được phát hành tại **Releases** khi phiên bản đó có cung cấp.
 
 ## BridgeX có gì khác?
 
@@ -70,7 +71,7 @@ Khi release đầu tiên được publish:
 
 1. mở **[Releases](https://github.com/kyousuke33/TNSuite-BridgeX/releases)**;
 2. tải file cài đặt của phiên bản mới nhất;
-3. nếu muốn kiểm tra trước khi chạy, đối chiếu SHA-256 và mở link VirusTotal trong release notes;
+3. nếu muốn kiểm tra trước khi chạy, đối chiếu SHA-256 và mở kết quả VirusTotal ngay trong release;
 4. chạy installer và sử dụng BridgeX như một ứng dụng Windows thông thường.
 
 Nếu không muốn cài đặt, hãy dùng bản portable khi release đó có cung cấp.
@@ -119,14 +120,6 @@ BridgeX có thể phù hợp nếu bạn:
 - thích dùng phần mềm miễn phí và có thể xem source code.
 
 Nếu FileZilla hiện tại đã đáp ứng đầy đủ nhu cầu của bạn, bạn không nhất thiết phải chuyển sang BridgeX.
-
-## VirusTotal có cần thiết không?
-
-Có — nhưng theo cách đơn giản.
-
-Vì BridgeX là ứng dụng Windows được chia sẻ dưới dạng file thực thi, tôi muốn người dùng có thể nhìn vào release và kiểm tra nhanh file trước khi tải hoặc cài. Vì vậy mỗi binary release sẽ cố gắng cung cấp **link VirusTotal của chính artifact đó** cùng với SHA-256.
-
-VirusTotal ở đây chỉ giúp người dùng có thêm một bước kiểm tra dễ thấy và dễ hiểu. Nó không thay thế việc tải file từ đúng nguồn hoặc đối chiếu hash.
 
 ## Miễn phí và mã nguồn mở
 
