@@ -1,0 +1,178 @@
+name: BridgeX Windows Release
+
+on:
+  workflow_run:
+    workflows: ["BridgeX Governance Gates"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout exact verified main SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Validate release request
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $request = Get-Content '.release/release-request.json' -Raw | ConvertFrom-Json
+          if ($request.schema -ne 'tnsuite.bridgex.release-request.v1') { throw 'RELEASE_REQUEST_SCHEMA_INVALID' }
+          if ($request.channel -ne 'github-releases') { throw 'RELEASE_CHANNEL_INVALID' }
+          if ($request.tag -ne 'v0.5-Build12-Hotfix16') { throw 'RELEASE_TAG_INVALID' }
+          if ($request.build_name -ne 'TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full') { throw 'BUILD_NAME_INVALID' }
+          if ($request.rcp_profile -ne 'tnsuite.public-desktop-github-release.v1') { throw 'RCP_RELEASE_PROFILE_INVALID' }
+          if ($request.rcp_authority_sha -notmatch '^[0-9a-f]{40}$') { throw 'RCP_AUTHORITY_SHA_INVALID' }
+
+          $sourceSha = '${{ github.event.workflow_run.head_sha }}'
+          if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'SOURCE_SHA_INVALID' }
+
+          "BRIDGEX_RELEASE_TAG=$($request.tag)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BRIDGEX_RELEASE_TITLE=$($request.title)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_NAME=$($request.build_name)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RCP_RELEASE_PROFILE=$($request.rcp_profile)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RCP_AUTHORITY_SHA=$($request.rcp_authority_sha)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BRIDGEX_SOURCE_SHA=$sourceSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check whether release already exists
+        id: release_state
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:BRIDGEX_RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host 'GITHUB_RELEASE_ALREADY_EXISTS=PASS'
+          }
+          else {
+            'publish=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host 'GITHUB_RELEASE_REQUIRED=YES'
+          }
+
+      - name: Build Windows installer and portable archive
+        if: steps.release_state.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Build-TNSuiteBridgeX.ps1
+          if ($LASTEXITCODE -ne 0) { throw "WINDOWS_BUILD_FAILED=$LASTEXITCODE" }
+          Write-Host 'WINDOWS_COMPILE_QA=PASS'
+          Write-Host 'INSTALLER_BUILD_QA=PASS'
+          Write-Host 'PORTABLE_BUILD_QA=PASS'
+
+      - name: Prepare immutable release assets
+        if: steps.release_state.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Join-Path $PWD 'release-assets'
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+
+          $setup = Join-Path $PWD "dist\$env:BUILD_NAME-Setup.exe"
+          $portable = Join-Path $PWD "dist\$env:BUILD_NAME.zip"
+          if (-not (Test-Path -LiteralPath $setup)) { throw "INSTALLER_MISSING=$setup" }
+          if (-not (Test-Path -LiteralPath $portable)) { throw "PORTABLE_MISSING=$portable" }
+
+          Copy-Item -LiteralPath $setup -Destination $assets
+          Copy-Item -LiteralPath $portable -Destination $assets
+
+          $setupName = Split-Path -Leaf $setup
+          $portableName = Split-Path -Leaf $portable
+          $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assets $setupName)).Hash.ToLowerInvariant()
+          $portableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assets $portableName)).Hash.ToLowerInvariant()
+          $sumText = "$setupHash *$setupName`n$portableHash *$portableName`n"
+          [System.IO.File]::WriteAllText((Join-Path $assets 'SHA256SUMS.txt'), $sumText, [System.Text.Encoding]::ASCII)
+
+          Write-Host "INSTALLER_SHA256=$setupHash"
+          Write-Host "PORTABLE_SHA256=$portableHash"
+          Write-Host 'RELEASE_ASSET_SHA256=PASS'
+
+      - name: Governed desktop publication acceptance
+        if: steps.release_state.outputs.publish == 'true'
+        shell: bash
+        env:
+          BRIDGEX_SETUP: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe
+          BRIDGEX_PORTABLE: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
+          BRIDGEX_SHA256_FILE: release-assets/SHA256SUMS.txt
+        run: bash .release/production-acceptance.sh
+
+      - name: Write release notes
+        if: steps.release_state.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $hashLines = Get-Content 'release-assets/SHA256SUMS.txt'
+          $notes = @"
+          # TNSuite BridgeX v0.5 Build12-Hotfix16
+
+          **File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**
+
+          Đây là binary release đầu tiên của BridgeX dành cho Windows x64. Dự án được chia sẻ miễn phí và mã nguồn mở.
+
+          ## Tải xuống
+
+          - **Installer:** `$env:BUILD_NAME-Setup.exe`
+          - **Portable:** `$env:BUILD_NAME.zip`
+          - **Checksum:** `SHA256SUMS.txt`
+
+          ## Có gì trong bản này
+
+          - Dark Mode / Light Mode;
+          - ghi nhớ giao diện đã chọn;
+          - English / Tiếng Việt;
+          - SFTP / truyền tệp;
+          - Windows installer và portable build;
+          - CLI automation/SFTP có phạm vi giới hạn.
+
+          ## SHA-256
+
+          ```text
+          $($hashLines -join "`n")
+          ```
+
+          **Source:** `$env:BRIDGEX_SOURCE_SHA`
+
+          VirusTotal sẽ được gắn theo từng artifact nếu có report cho đúng file/hash; release này không tự tuyên bố kết quả quét khi chưa có report thực tế.
+
+          > BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.
+          "@
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Upload build evidence artifact
+        if: steps.release_state.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-release-${{ github.event.workflow_run.head_sha }}
+          path: |
+            release-assets/*
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: steps.release_state.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:BRIDGEX_RELEASE_TAG `
+            "release-assets/$env:BUILD_NAME-Setup.exe#Windows x64 installer" `
+            "release-assets/$env:BUILD_NAME.zip#Windows x64 portable" `
+            "release-assets/SHA256SUMS.txt#SHA-256 checksums" `
+            --repo $env:GITHUB_REPOSITORY `
+            --target $env:BRIDGEX_SOURCE_SHA `
+            --title $env:BRIDGEX_RELEASE_TITLE `
+            --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw "GITHUB_RELEASE_CREATE_FAILED=$LASTEXITCODE" }
+          Write-Host 'GITHUB_RELEASE_PUBLISHED=PASS'
+          Write-Host 'PRODUCTION_HOST_ACCESS=NONE'
+          Write-Host 'DATABASE_EXECUTION=NOT_PERFORMED'
