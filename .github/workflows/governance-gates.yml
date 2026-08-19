@@ -1,0 +1,65 @@
+name: BridgeX Governance Gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Public repository CI trust boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow_root = Path('.github/workflows')
+          forbidden = {
+              'forbidden runner label': 'self' + '-hosted',
+              'shared trusted CI host reference': 'tn-' + 'ci-01',
+              'forbidden privileged PR event': 'pull_request' + '_target',
+              'repository secret reference': 'secrets' + '.',
+          }
+
+          failures = []
+          for path in sorted(list(workflow_root.glob('*.yml')) + list(workflow_root.glob('*.yaml'))):
+              text = path.read_text(encoding='utf-8')
+              for label, needle in forbidden.items():
+                  if needle in text:
+                      failures.append(f'{path}: {label}')
+
+          if failures:
+              for failure in failures:
+                  print(f'PUBLIC_CI_TRUST=FAIL {failure}')
+              raise SystemExit(1)
+
+          print('BRIDGEX_PUBLIC_REPO=CONFIRMED')
+          print('PUBLIC_PR_SELF_HOSTED_EXECUTION=NONE')
+          print('FORK_PR_RUNNER=GITHUB_HOSTED')
+          print('PULL_REQUEST_TARGET_UNTRUSTED_EXECUTION=NONE')
+          print('CI_SECRET_EXPOSURE=NONE')
+          print('TN_CI_01_WORKFLOW_ROUTING=NONE')
+          PY
+
+      - name: Required governed structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f AGENTS.md
+          test -f docs/90_GOVERNANCE/CURRENT_STATE.md
+          test -f .release/project.json
+          test -f .release/source-gates.sh
+          test -f skills/project-audit/SKILL.md
+          echo GOVERNANCE_STRUCTURE_QA=PASS
+
+      - name: Source gate
+        run: bash .release/source-gates.sh

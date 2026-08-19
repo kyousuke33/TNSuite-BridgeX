@@ -1,0 +1,164 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: TNSuite BridgeX 0.5 Build12-Hotfix16\n"
+"PO-Revision-Date: 2026-08-18 00:00+0700\n"
+"Last-Translator: TNSuite\n"
+"Language-Team: Vietnamese\n"
+"Language: vi_VN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Appearance"
+msgstr "Giao diện"
+
+msgid "&Language:"
+msgstr "&Ngôn ngữ:"
+
+msgid "English"
+msgstr "Tiếng Anh"
+
+msgid "Vietnamese"
+msgstr "Tiếng Việt"
+
+msgid "&Theme:"
+msgstr "&Chủ đề:"
+
+msgid "Light"
+msgstr "Sáng"
+
+msgid "Dark"
+msgstr "Tối"
+
+msgid "Language and theme changes are applied after restarting TNSuite BridgeX."
+msgstr "Thay đổi ngôn ngữ và chủ đề được áp dụng sau khi khởi động lại TNSuite BridgeX."
+
+msgid "TNSuite BridgeX"
+msgstr "TNSuite BridgeX"
+
+msgid "Secure Transfer & Automation"
+msgstr "Truyền tệp an toàn & Tự động hóa"
+
+msgid "&Connect"
+msgstr "&Kết nối"
+
+msgid "&Automation"
+msgstr "&Tự động hóa"
+
+msgid "Open BridgeX &CLI"
+msgstr "Mở BridgeX &CLI"
+
+msgid "Open the BridgeX automation CLI in PowerShell"
+msgstr "Mở CLI tự động hóa BridgeX trong PowerShell"
+
+msgid "Run CLI &Doctor"
+msgstr "Chạy CLI &Doctor"
+
+msgid "Validate Windows OpenSSH and BridgeX CLI runtime"
+msgstr "Kiểm tra Windows OpenSSH và runtime BridgeX CLI"
+
+msgid "&Getting help..."
+msgstr "&Trợ giúp..."
+
+msgid "&Report a bug..."
+msgstr "&Báo lỗi..."
+
+msgid "Welcome to TNSuite BridgeX"
+msgstr "Chào mừng đến TNSuite BridgeX"
+
+msgid "What's new in BridgeX"
+msgstr "Điểm mới trong BridgeX"
+
+msgid "BridgeX Build12 adds a redesigned connection header, Light/Dark themes, and English/Vietnamese UI."
+msgstr "BridgeX Build12 bổ sung khu vực kết nối được thiết kế lại, chủ đề Sáng/Tối và giao diện Tiếng Anh/Tiếng Việt."
+
+msgid "Getting help"
+msgstr "Trợ giúp"
+
+msgid "Open Help > Getting help for the local BridgeX guide."
+msgstr "Mở Trợ giúp > Trợ giúp để xem hướng dẫn BridgeX cục bộ."
+
+msgid "Use Help > Report a bug for the BridgeX diagnostic checklist."
+msgstr "Dùng Trợ giúp > Báo lỗi để xem checklist chẩn đoán BridgeX."
+
+msgid "Documentation"
+msgstr "Tài liệu"
+
+msgid "Sites stores reusable connections; Quick Connect is for one-off sessions."
+msgstr "Sites lưu các kết nối dùng lại; Quick Connect dành cho phiên kết nối nhanh."
+
+msgid "Automation opens the BridgeX CLI for scripted SFTP operations."
+msgstr "Automation mở BridgeX CLI để chạy các thao tác SFTP bằng script."
+
+msgid "Appearance and language are configured in Settings > Interface."
+msgstr "Chủ đề và ngôn ngữ được cấu hình tại Settings > Interface."
+
+msgid "About TNSuite BridgeX"
+msgstr "Giới thiệu TNSuite BridgeX"
+
+msgid "Homepage:"
+msgstr "Trang chủ:"
+
+msgid "Compatibility settings directory:"
+msgstr "Thư mục cấu hình tương thích:"
+
+msgid "Close TNSuite BridgeX"
+msgstr "Đóng TNSuite BridgeX"
+
+msgid "Open TNSuite BridgeX settings"
+msgstr "Mở cài đặt TNSuite BridgeX"
+
+msgid "Sites"
+msgstr "Kết nối"
+
+msgid "Log"
+msgstr "Nhật ký"
+
+msgid "Local"
+msgstr "Cục bộ"
+
+msgid "Remote"
+msgstr "Máy chủ"
+
+msgid "Queue"
+msgstr "Hàng đợi"
+
+msgid "Refresh"
+msgstr "Làm mới"
+
+msgid "Start"
+msgstr "Bắt đầu"
+
+msgid "Cancel"
+msgstr "Hủy"
+
+msgid "Disconnect"
+msgstr "Ngắt kết nối"
+
+msgid "Reconnect"
+msgstr "Kết nối lại"
+
+msgid "Filter"
+msgstr "Bộ lọc"
+
+msgid "Compare"
+msgstr "So sánh"
+
+msgid "Sync"
+msgstr "Đồng bộ"
+
+msgid "Search"
+msgstr "Tìm kiếm"
+
+msgid "Language or theme changes require restarting TNSuite BridgeX."
+msgstr "Thay đổi ngôn ngữ hoặc chủ đề yêu cầu khởi động lại TNSuite BridgeX."
+
+msgid "Restart TNSuite BridgeX"
+msgstr "Khởi động lại TNSuite BridgeX"
+
+msgid "Restart now"
+msgstr "Khởi động ngay"
+
+msgid "Later"
+msgstr "Để sau"

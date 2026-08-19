@@ -1,0 +1,57 @@
+# Build/transient
+dist/
+build*/
+work/
+tmp/
+.tmp/
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# Downloaded toolchains/upstream
+filezilla-*.tar.*
+wxWidgets-*/
+msys64/
+
+# Release artifacts
+*.exe
+*.msi
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tar.xz
+*.sha256
+SHA256SUMS.txt
+KIT_SHA256SUMS.txt
+
+# Generated evidence
+qa/*_EXECUTION.log
+qa/*_REPORT.md
+qa/*_RESULTS.txt
+evidence/runtime/
+evidence/release/
+!evidence/.gitkeep
+!evidence/README.md
+
+# Secrets/signing
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+secrets/
+
+# Editor/OS/Python
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
