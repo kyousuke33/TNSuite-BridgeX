@@ -9,12 +9,17 @@ UPSTREAM_BASE=FileZilla Client 3.70.6
 PLATFORM=Windows x64
 WXWIDGETS=3.3.3
 GITHUB_VISIBILITY=PUBLIC
+PUBLIC_REPOSITORY=CONFIRMED
 CANONICAL_SOURCE=PR_3_EXACT_BASELINE_IMPORTED_MERGE_PENDING
 SOURCE_BASELINE_MANIFEST=PASS
 SOURCE_REGRESSION_QA=PASS
-SELF_HOSTED_RUNNER=tn-ci-01-bridgex
-SELF_HOSTED_CI=PASS
-POST_JOB_WORKSPACE_CLEANUP=PASS
+CI_RUNNER=GITHUB_HOSTED
+PUBLIC_PR_SELF_HOSTED_EXECUTION=NONE
+FORK_PR_RUNNER=GITHUB_HOSTED
+PULL_REQUEST_TARGET_UNTRUSTED_EXECUTION=NONE
+CI_SECRET_EXPOSURE=NONE_FROM_REPOSITORY_WORKFLOWS
+TN_CI_01_WORKFLOW_ROUTING=NONE
+SHARED_TN_CI_01_RUNNER=REMOVAL_PENDING
 PRODUCTION_ACCESS=NONE
 DATABASE_EXECUTION=NOT_PERFORMED
 WINDOWS_COMPILE_QA=NOT_RUN_FOR_BOOTSTRAP_PR
@@ -31,6 +36,8 @@ DATABASE=NOT_APPLICABLE
 WEB_HEALTH=NOT_APPLICABLE
 ```
 
-The bootstrap PR proves canonical source integrity, governed source/static regression gates, and the isolated Linux self-hosted CI lifecycle. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
+BridgeX is public. Repository PR/source CI is routed only to GitHub-hosted infrastructure and is governed by the central RCP contract `tnsuite.ci-public-repository-trust.v1`. The previously configured shared `tn-ci-01-bridgex` runner is no longer an allowed execution target and remains `REMOVAL_PENDING` until GitHub registration and host-side runner configuration are independently removed and verified.
+
+The bootstrap PR proves canonical source integrity and governed source/static regression gates. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
 
 No planned Build13 capability may be promoted to PASS without exact evidence.
