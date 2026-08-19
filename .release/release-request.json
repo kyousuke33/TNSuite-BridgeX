@@ -1,0 +1,7 @@
+{
+  "schema": "tnsuite.bridgex.release-request.v1",
+  "tag": "v0.5-Build12-Hotfix16",
+  "title": "TNSuite BridgeX v0.5 Build12-Hotfix16",
+  "build_name": "TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full",
+  "channel": "github-releases"
+}
