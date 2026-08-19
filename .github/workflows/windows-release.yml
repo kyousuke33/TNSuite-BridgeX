@@ -101,6 +101,8 @@ jobs:
         if: steps.release_state.outputs.publish == 'true'
         shell: bash
         env:
+          BRIDGEX_TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          BRIDGEX_TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           BRIDGEX_SETUP: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe
           BRIDGEX_PORTABLE: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
           BRIDGEX_SHA256_FILE: release-assets/SHA256SUMS.txt
