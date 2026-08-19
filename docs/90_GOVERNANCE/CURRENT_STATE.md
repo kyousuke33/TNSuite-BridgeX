@@ -5,12 +5,16 @@ SOURCE_REPOSITORY=kyousuke33/TNSuite-BridgeX
 CANONICAL_TARGET_BRANCH=main
 BOOTSTRAP_PR=3
 BOOTSTRAP_BASELINE=v0.5-Build12-Hotfix16
+BOOTSTRAP_REVIEWED_HEAD=cc70d96582283b1866af612c55d90528cff6727e
+BOOTSTRAP_GOVERNANCE_RUN=32268088038
+BOOTSTRAP_GOVERNANCE=PASS
+BOOTSTRAP_MERGE_SHA=14a18dc1b26c8910e85e724079df70a25ce7e690
 UPSTREAM_BASE=FileZilla Client 3.70.6
 PLATFORM=Windows x64
 WXWIDGETS=3.3.3
 GITHUB_VISIBILITY=PUBLIC
 PUBLIC_REPOSITORY=CONFIRMED
-CANONICAL_SOURCE=PR_3_EXACT_BASELINE_IMPORTED_MERGE_PENDING
+CANONICAL_SOURCE=MAIN
 SOURCE_BASELINE_MANIFEST=PASS
 SOURCE_REGRESSION_QA=PASS
 RCP_PUBLIC_CI_AUTHORITY=tnsuite.ci-public-repository-trust.v1
@@ -32,6 +36,7 @@ TN_CI_01_BRIDGEX_UNIX_IDENTITY=ABSENT
 MAIN_PROTECTION=ENABLED
 REQUIRED_CI_CHECKS=ENABLED
 RULESET_BYPASS=NONE
+CLOSURE_CHANGE_CLASS=GOVERNANCE_STATE_ONLY
 PRODUCTION_ACCESS=NONE
 DATABASE_EXECUTION=NOT_PERFORMED
 WINDOWS_COMPILE_QA=NOT_RUN_FOR_BOOTSTRAP_PR
@@ -48,10 +53,12 @@ DATABASE=NOT_APPLICABLE
 WEB_HEALTH=NOT_APPLICABLE
 ```
 
+BridgeX `main` is now the canonical governed source authority for the accepted `v0.5 Build12-Hotfix16` baseline, established by bootstrap PR #3 merge SHA `14a18dc1b26c8910e85e724079df70a25ce7e690`. The exact pre-merge head `cc70d96582283b1866af612c55d90528cff6727e` passed GitHub-hosted governance run `32268088038` before merge.
+
 BridgeX is public. Repository PR/source CI is routed only to GitHub-hosted infrastructure and is governed by canonical RCP contract `tnsuite.ci-public-repository-trust.v1` at RCP merge SHA `d65902e04406e088c29ee09cc64611179e66e754`. The previously configured shared `tn-ci-01-bridgex` runner has been removed from GitHub and its bounded host-side service, credentials, workspace, home/tmp/cache state and Unix identity have been removed from `tn-ci-01`.
 
 Repository owner confirmed the public governed main ruleset with no bypass actors is active. Required `governance` remains strict; public contributor code is not permitted to execute on shared TNSuite self-hosted infrastructure.
 
-The bootstrap PR proves canonical source integrity and governed source/static regression gates. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
+The bootstrap proves canonical source integrity and governed source/static regression gates. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
 
 No planned Build13 capability may be promoted to PASS without exact evidence.
