@@ -143,8 +143,6 @@ jobs:
 
           **Source:** `$env:BRIDGEX_SOURCE_SHA`
 
-          VirusTotal sẽ được gắn theo từng artifact nếu có report cho đúng file/hash; release này không tự tuyên bố kết quả quét khi chưa có report thực tế.
-
           > BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.
           "@
           [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes, [System.Text.UTF8Encoding]::new($false))
