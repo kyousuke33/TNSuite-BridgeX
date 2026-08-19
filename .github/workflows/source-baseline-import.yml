@@ -6,6 +6,11 @@ on:
       - agent/governed-desktop-bootstrap
     paths:
       - .github/workflows/source-baseline-import.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/source-baseline-import.yml
 
 permissions:
   contents: write
