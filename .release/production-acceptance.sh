@@ -6,9 +6,10 @@ fail() {
   exit 42
 }
 
-[[ "${GITHUB_EVENT_NAME:-}" == "push" ]] || fail "EVENT_NOT_PUSH"
-[[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || fail "REF_NOT_MAIN"
-[[ -n "${GITHUB_SHA:-}" && "${BRIDGEX_SOURCE_SHA:-}" == "${GITHUB_SHA}" ]] || fail "SOURCE_SHA_MISMATCH"
+[[ "${GITHUB_EVENT_NAME:-}" == "workflow_run" ]] || fail "EVENT_NOT_WORKFLOW_RUN"
+[[ "${BRIDGEX_TRIGGER_EVENT:-}" == "push" ]] || fail "SOURCE_EVENT_NOT_PUSH"
+[[ "${BRIDGEX_TRIGGER_BRANCH:-}" == "main" ]] || fail "SOURCE_BRANCH_NOT_MAIN"
+[[ "${BRIDGEX_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "SOURCE_SHA_INVALID"
 [[ "${RCP_RELEASE_PROFILE:-}" == "tnsuite.public-desktop-github-release.v1" ]] || fail "RCP_RELEASE_PROFILE_MISMATCH"
 [[ "${RCP_AUTHORITY_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "RCP_AUTHORITY_SHA_INVALID"
 [[ "${BRIDGEX_RELEASE_TAG:-}" == "v0.5-Build12-Hotfix16" ]] || fail "RELEASE_TAG_MISMATCH"
