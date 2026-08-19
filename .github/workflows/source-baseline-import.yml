@@ -1,0 +1,112 @@
+name: BridgeX Build12-Hotfix16 Source Import
+
+on:
+  push:
+    branches:
+      - agent/governed-desktop-bootstrap
+    paths:
+      - .github/workflows/source-baseline-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  source-import:
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - tnsuite-ci
+      - bridgex
+      - ci-v1
+      - no-prod
+    steps:
+      - name: Checkout exact feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/governed-desktop-bootstrap
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Import exact Build12-Hotfix16 canonical source
+        shell: bash
+        env:
+          ARCHIVE: /var/lib/tnsuite-ci/tmp/bridgex/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-BuildKit.zip
+          ARCHIVE_SHA256: be05c1f52fc6bb914ed39a3d5d1fddd88ea94c1b5e9523af304a7d04970d2ed9
+          SOURCE_DIR: TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full
+          MANIFEST: .release/build12-hotfix16-source-manifest.sha256
+        run: |
+          set -Eeuo pipefail
+          umask 027
+
+          test "$(hostname -s)" = 'tn-ci-01'
+          test "$(id -un)" = 'tnci-bridgex'
+          test "${RUNNER_NAME:-}" = 'tn-ci-01-bridgex'
+          test "${TNSUITE_CI_PROJECT_KEY:-}" = 'bridgex'
+
+          test -f "$ARCHIVE" || {
+            echo "SOURCE_IMPORT=BLOCKED reason=ARCHIVE_NOT_STAGED path=$ARCHIVE" >&2
+            exit 42
+          }
+          test ! -L "$ARCHIVE"
+          test "$(stat -c '%U' "$ARCHIVE")" = 'tnci-bridgex' || {
+            echo "SOURCE_IMPORT=BLOCKED reason=ARCHIVE_OWNER_MISMATCH expected=tnci-bridgex actual=$(stat -c '%U' "$ARCHIVE")" >&2
+            exit 42
+          }
+
+          printf '%s  %s\n' "$ARCHIVE_SHA256" "$ARCHIVE" | sha256sum --check --strict -
+          echo 'SOURCE_ARCHIVE_SHA256=PASS'
+
+          STAGE="$(mktemp -d "${TMPDIR:-/var/lib/tnsuite-ci/tmp/bridgex}/source-import.XXXXXX")"
+          trap 'rm -rf "$STAGE"' EXIT
+
+          unzip -q "$ARCHIVE" -d "$STAGE"
+          SOURCE_ROOT="$STAGE/$SOURCE_DIR"
+          test -d "$SOURCE_ROOT"
+          test ! -L "$SOURCE_ROOT"
+          test -f "$MANIFEST"
+
+          imported=0
+          while IFS= read -r line; do
+            rel="${line#*  }"
+            src="$SOURCE_ROOT/$rel"
+            test -f "$src" || {
+              echo "SOURCE_IMPORT=BLOCKED reason=MANIFEST_SOURCE_MISSING path=$rel" >&2
+              exit 42
+            }
+            test ! -L "$src"
+            install -D -m "$(stat -c '%a' "$src")" "$src" "$rel"
+            imported=$((imported + 1))
+          done < "$MANIFEST"
+
+          test "$imported" -eq 53 || {
+            echo "SOURCE_IMPORT=BLOCKED reason=IMPORT_COUNT_MISMATCH expected=53 actual=$imported" >&2
+            exit 42
+          }
+          echo 'SOURCE_IMPORT_FILE_COUNT=53'
+
+          sha256sum --check --strict "$MANIFEST"
+          echo 'SOURCE_IMPORT_MANIFEST=PASS'
+
+          bash .release/source-gates.sh
+          echo 'SOURCE_IMPORT_SOURCE_GATES=PASS'
+
+          rm -f .github/workflows/source-baseline-import.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo 'SOURCE_IMPORT=BLOCKED reason=NO_CANONICAL_DIFF' >&2
+            exit 42
+          fi
+
+          git commit -m 'Import canonical Build12-Hotfix16 source baseline'
+          git push origin HEAD:agent/governed-desktop-bootstrap
+
+          rm -f "$ARCHIVE"
+          echo 'SOURCE_ARCHIVE_LOCAL_RETENTION=0'
+          echo 'SOURCE_IMPORT=PASS'
+          echo 'PRODUCTION_ACCESS=NONE'
+          echo 'DATABASE_EXECUTION=NOT_PERFORMED'
