@@ -21,7 +21,10 @@ echo 'SOURCE_BASELINE_MANIFEST=PASS'
 python3 qa/hotfix9_qa_dependency_check.py .
 python3 qa/bridgex_locale_source_check.py locales/bridgex_vi_VN.po
 python3 qa/build_scheduler_check.py scripts/build-filezilla-dark.sh
-python3 qa/branding_asset_check.py .
+# qa/branding_asset_check.py is preserved byte-exact in the Hotfix16 source
+# manifest, but its pre-governance expectation includes three audited-out
+# design/reference exports. Run the governance branding contract instead.
+python3 scripts/qa/branding_contract_check.py .
 python3 qa/product_content_check.py .
 python3 qa/hotfix4_runtime_regression_check.py .
 python3 qa/hotfix5_patch_anchor_check.py .
