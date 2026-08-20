@@ -19,6 +19,8 @@ Các bản phát hành Windows chính thức được cung cấp tại:
 
 **[GitHub Releases →](https://github.com/kyousuke33/TNSuite-BridgeX/releases)**
 
+Bản **v0.5 Build12-Hotfix16** đã bị thu hồi và không còn được xem là bản phân phối hợp lệ.
+
 Với mỗi tệp phát hành, trang **Releases** sẽ công bố **SHA-256** để bạn đối chiếu tính toàn vẹn của tệp đã tải. Khi có báo cáo VirusTotal cho đúng SHA-256 của tệp đó, trang phát hành sẽ kèm liên kết đến báo cáo tương ứng.
 
 Ví dụ:
