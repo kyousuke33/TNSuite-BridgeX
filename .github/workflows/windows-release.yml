@@ -1,26 +1,25 @@
 name: BridgeX Windows Release
 
 on:
-  workflow_run:
-    workflows: ["BridgeX Governance Gates"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact protected-main source SHA already verified by governance
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   release:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
     runs-on: windows-latest
 
     steps:
       - name: Checkout exact verified main SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.source_sha }}
 
       - name: Validate release request
         shell: pwsh
@@ -34,8 +33,11 @@ jobs:
           if ($request.rcp_profile -ne 'tnsuite.public-desktop-github-release.v1') { throw 'RCP_RELEASE_PROFILE_INVALID' }
           if ($request.rcp_authority_sha -notmatch '^[0-9a-f]{40}$') { throw 'RCP_AUTHORITY_SHA_INVALID' }
 
-          $sourceSha = '${{ github.event.workflow_run.head_sha }}'
+          $sourceSha = '${{ inputs.source_sha }}'
+          $callerSha = '${{ github.sha }}'
           if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'SOURCE_SHA_INVALID' }
+          if ($callerSha -notmatch '^[0-9a-f]{40}$') { throw 'CALLER_SHA_INVALID' }
+          if ($sourceSha -ne $callerSha) { throw 'SOURCE_SHA_CALLER_MISMATCH' }
 
           "BRIDGEX_RELEASE_TAG=$($request.tag)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "BRIDGEX_RELEASE_TITLE=$($request.title)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -101,8 +103,8 @@ jobs:
         if: steps.release_state.outputs.publish == 'true'
         shell: bash
         env:
-          BRIDGEX_TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
-          BRIDGEX_TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          BRIDGEX_TRIGGER_EVENT: ${{ github.event_name }}
+          BRIDGEX_TRIGGER_BRANCH: ${{ github.ref_name }}
           BRIDGEX_SETUP: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe
           BRIDGEX_PORTABLE: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
           BRIDGEX_SHA256_FILE: release-assets/SHA256SUMS.txt
@@ -151,7 +153,7 @@ jobs:
         if: steps.release_state.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: bridgex-release-${{ github.event.workflow_run.head_sha }}
+          name: bridgex-release-${{ inputs.source_sha }}
           path: |
             release-assets/*
             release-notes.md
