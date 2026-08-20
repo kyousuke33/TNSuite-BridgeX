@@ -51,8 +51,15 @@ CENTRAL_CAPABILITY_GAP_PROJECT_WORKAROUND=PROHIBITED
 CI_HOST_RUNTIME_AUTHORITY=NONE
 BUILD_ONCE_PROMOTE_SAME_ARTIFACT=REQUIRED
 PASS_WITHOUT_REQUIRED_EVIDENCE=PROHIBITED
+PROJECT_ROADMAP_GOVERNANCE=tnsuite.project-roadmap-governance.v1
+PROJECT_BIG_PICTURE_DISCOVERY=REQUIRED
+PROJECT_ROADMAP_DISCOVERY=REQUIRED
+PROJECT_CURRENT_STATE_DISCOVERY=REQUIRED
+ROADMAP_ACTUAL_STATE_WINS=REQUIRED
+ROADMAP_CHAT_MEMORY_AUTHORITY=NONE
+ROADMAP_ENABLED_AUTO_RESUME=REQUIRED
 TNSUITE_AGENTS_SYNC=RCP_MANAGED
-TNSUITE_AGENTS_POLICY_REVISION=2026-08-20.1
+TNSUITE_AGENTS_POLICY_REVISION=2026-08-20.2
 
 Central managed execution rules:
 1. Before managed implementation, load project-local authority and run the centrally versioned TNSuite Authority Preflight for declared subscriptions.
@@ -62,8 +69,11 @@ Central managed execution rules:
 5. A project receiving a valid external request must independently review the evidence and classify it as ACCEPTED, REJECTED_NOT_OWNED, NEEDS_MORE_EVIDENCE, DUPLICATE or SUPERSEDED. An accepted request that blocks another managed project must be tracked through the receiver's own governed work item, source QA, PR, required CI and safe merge.
 6. After an accepted external request is resolved, publish a resolution callback containing the request id, receiver project, resolution work item/PR, exact resolution source SHA, capability or fix identity and revalidation requirement. The requester must revalidate the original blocked condition before marking the dependency resolved and automatically resume only after that revalidation passes.
 7. When a proven central capability is missing, record or reuse the central dependency and park the child work item without consuming an active lane. Do not build a project-local shadow control plane, duplicated central protocol or workaround that bypasses central authority.
-8. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next phase without waiting for a new user prompt.
-9. Do not treat ordinary source edits, tests, PR creation, required CI, safe merge or phase continuation as human approval gates when canonical authority already defines the work.
-10. Human approval remains required where canonical policy explicitly requires it, including Production promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
-11. Never claim SOURCE_PASS, ARTIFACT_READY, STAGING_PASS, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority.
+8. For every repository classified roadmap_enabled=true, recover project intent in this order: AGENTS.md, PROJECT_BIG_PICTURE.md, ROADMAP.md, CURRENT_STATE.md, relevant evidence, live Work Item, then actual GitHub/CI/runtime state. Reconcile stale prose before mutation; actual state wins and chat memory is not authority.
+9. PROJECT_BIG_PICTURE.md is stable product-direction authority and must not become a moving PR/SHA/CI/blocker cursor. ROADMAP.md is ordered durable planning authority and must not replace CURRENT_STATE.md or the live Work Item.
+10. Do not fabricate PROJECT_BIG_PICTURE.md or ROADMAP.md for a repository classified DEFERRED because source/product authority is not established. Keep the repo explicitly deferred until evidence supports roadmap enablement.
+11. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next phase without waiting for a new user prompt.
+12. Do not treat ordinary source edits, tests, PR creation, required CI, safe merge or phase continuation as human approval gates when canonical authority already defines the work.
+13. Human approval remains required where canonical policy explicitly requires it, including Production promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
+14. Never claim SOURCE_PASS, ARTIFACT_READY, STAGING_PASS, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority.
 <!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
