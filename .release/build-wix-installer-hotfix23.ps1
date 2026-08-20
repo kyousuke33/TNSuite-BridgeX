@@ -52,7 +52,7 @@ $upgradeNeedle = "[void]`$product.AppendLine('    <MajorUpgrade DowngradeErrorMe
 $upgradeReplacement = $upgradeNeedle + "`r`n" +
     "[void]`$product.AppendLine('    <Property Id=`"MSIDISABLERMRESTART`" Value=`"1`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <Property Id=`"MSIRESTARTMANAGERCONTROL`" Value=`"Disable`" />')" + "`r`n" +
-    "[void]`$product.AppendLine('    <SetProperty Id=`"WixQuietExecCmdLine`" Value=`"&amp;quot;[System64Folder]cmd.exe&amp;quot; /d /s /c &amp;quot;&amp;quot;[System64Folder]taskkill.exe&amp;quot; /F /T /IM BridgeX.exe &amp;gt;nul 2&amp;gt;&amp;amp;1 &amp;amp; &amp;quot;[System64Folder]taskkill.exe&amp;quot; /F /T /IM BridgeX-CLI.exe &amp;gt;nul 2&amp;gt;&amp;amp;1 &amp;amp; exit /b 0&amp;quot;`" Before=`"ForceCloseBridgeX`" Sequence=`"execute`" />')" + "`r`n" +
+    "[void]`$product.AppendLine('    <SetProperty Id=`"WixQuietExecCmdLine`" Value=`"&quot;[System64Folder]cmd.exe&quot; /d /s /c &quot;&quot;[System64Folder]taskkill.exe&quot; /F /T /IM BridgeX.exe &gt;nul 2&gt;&amp;1 &amp; &quot;[System64Folder]taskkill.exe&quot; /F /T /IM BridgeX-CLI.exe &gt;nul 2&gt;&amp;1 &amp; exit /b 0&quot;`" Before=`"ForceCloseBridgeX`" Sequence=`"execute`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <CustomAction Id=`"ForceCloseBridgeX`" BinaryRef=`"Wix4UtilCA_X64`" DllEntry=`"WixQuietExec`" Execute=`"immediate`" Return=`"ignore`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <InstallExecuteSequence>')" + "`r`n" +
     "[void]`$product.AppendLine('      <Custom Action=`"ForceCloseBridgeX`" Before=`"InstallValidate`" Condition=`"Installed OR WIX_UPGRADE_DETECTED`" />')" + "`r`n" +
