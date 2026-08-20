@@ -64,6 +64,17 @@ jobs:
       - name: Source gate
         run: bash .release/source-gates.sh
 
+  windows-build-qa:
+    name: Windows build QA (dry run)
+    if: github.event_name == 'pull_request'
+    needs: governance
+    permissions:
+      contents: read
+    uses: ./.github/workflows/windows-release.yml
+    with:
+      source_sha: ${{ github.sha }}
+      publish_release: false
+
   windows-release:
     name: Governed Windows release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -73,3 +84,4 @@ jobs:
     uses: ./.github/workflows/windows-release.yml
     with:
       source_sha: ${{ github.sha }}
+      publish_release: true
