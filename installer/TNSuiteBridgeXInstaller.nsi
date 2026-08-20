@@ -1,6 +1,6 @@
 Unicode true
 RequestExecutionLevel admin
-SetCompressor /SOLID lzma
+SetCompressor zlib
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
@@ -101,16 +101,10 @@ Section "TNSuite BridgeX" SEC_MAIN
   SectionIn RO
   SetShellVarContext all
 
-  ; Close only a BridgeX process whose executable path belongs to this install.
-  ; This avoids killing a portable BridgeX instance elsewhere on the machine.
-  IfFileExists "$INSTDIR\bin\BridgeX.exe" 0 install_copy
-  SetOutPath "$TEMP"
-  File /oname=BridgeX-CloseInstalled.ps1 "${__FILEDIR__}\BridgeX-CloseInstalled.ps1"
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$TEMP\BridgeX-CloseInstalled.ps1" "$INSTDIR\bin\BridgeX.exe"'
-  Pop $0
-  Pop $1
-  Delete "$TEMP\BridgeX-CloseInstalled.ps1"
-
+  ; Security remediation: setup does not spawn PowerShell, bypass execution
+  ; policy, or terminate a process. If an existing BridgeX process keeps files
+  ; locked, marker-verified cleanup below fails closed and asks the user to
+  ; close BridgeX before retrying.
 install_copy:
   ; Hotfix14: cleaning the build payload alone does not remove development files
   ; left by an older installed build. Clean only a marker-verified BridgeX tree
@@ -124,7 +118,7 @@ install_clean_verified:
   SetOutPath "$TEMP"
   RMDir /r "$INSTDIR"
   IfFileExists "$INSTDIR\*.*" 0 install_copy_clean
-  MessageBox MB_ICONSTOP|MB_OK "Setup could not fully clean the previous BridgeX program directory. Close any process using BridgeX files and run Setup again. No mixed-version install was created."
+  MessageBox MB_ICONSTOP|MB_OK "Setup could not fully clean the previous BridgeX program directory. Close BridgeX and any process using its files, then run Setup again. No mixed-version install was created."
   Abort
 
 install_copy_clean:
@@ -175,16 +169,9 @@ Section "Uninstall"
   Abort
 
 uninstall_marker_ok:
-  ; Close only the installed BridgeX instance. The helper is embedded into the
-  ; uninstaller and extracted to %TEMP% on demand; it is not kept in Program Files.
-  ; If Windows still holds a DLL, /REBOOTOK below schedules the remainder.
-  SetOutPath "$TEMP"
-  File /oname=BridgeX-CloseInstalled.ps1 "${__FILEDIR__}\BridgeX-CloseInstalled.ps1"
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$TEMP\BridgeX-CloseInstalled.ps1" "$INSTDIR\bin\BridgeX.exe"'
-  Pop $0
-  Pop $1
-  Delete "$TEMP\BridgeX-CloseInstalled.ps1"
-
+  ; Security remediation: do not extract or execute a process-kill helper.
+  ; Move OUTDIR out of the installation tree and let NSIS schedule any locked
+  ; files for deletion on reboot.
 uninstall_shortcuts:
   Delete "$SMPROGRAMS\TNSuite BridgeX\TNSuite BridgeX.lnk"
   Delete "$SMPROGRAMS\TNSuite BridgeX\BridgeX CLI.lnk"
