@@ -56,7 +56,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           if ('${{ inputs.publish_release }}' -eq 'true') {
             gh release view $env:BRIDGEX_RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
-            if ($LASTEXITCODE -eq 0) {
+            $releaseExists = ($LASTEXITCODE -eq 0)
+            # `gh release view` returns 1 when the release does not exist. That is
+            # an expected branch condition here, not a workflow failure. Consume
+            # the native exit code so GitHub's pwsh wrapper does not fail the step.
+            $global:LASTEXITCODE = 0
+            if ($releaseExists) {
               'build=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
               'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
               Write-Host 'GITHUB_RELEASE_ALREADY_EXISTS=PASS'
