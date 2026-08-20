@@ -58,20 +58,20 @@ jobs:
           Write-Host "WIX_VERSION_PINNED=$env:WIX_VERSION"
           Write-Host 'WIX_TOOLCHAIN_QA=PASS'
 
-      - name: Build branded Hotfix20 installer
+      - name: Build branded Hotfix21 installer
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-QA.txt'
+          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-QA.txt'
 
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix20.ps1 `
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix21.ps1 `
             -PortableZip $portable `
             -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "WIX_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
 
-          $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX.msi'
-          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe'
+          $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX.msi'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe'
           foreach ($artifact in @($msi, $setup)) {
             if (-not (Test-Path -LiteralPath $artifact)) { throw "WIX_ARTIFACT_MISSING=$artifact" }
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact).Hash.ToLowerInvariant()
@@ -84,12 +84,15 @@ jobs:
           Write-Host "SETUP_EXE_ICON_RESOURCE=PASS size=$($setupIcon.Width)x$($setupIcon.Height)"
           $setupIcon.Dispose()
 
-          $theme = Get-Content -LiteralPath '.\.release\BridgeX.Hotfix20.Theme.xml' -Raw
-          if ($theme -notmatch 'Editbox Name="InstallBaseFolder"') { throw 'BASE_FOLDER_EDITBOX_BINDING=FAIL' }
-          if ($theme -notmatch 'BrowseDirectoryAction VariableName="InstallBaseFolder"') { throw 'BASE_FOLDER_BROWSE_BINDING=FAIL' }
-          Write-Host 'BASE_FOLDER_EDITBOX_BINDING=PASS'
-          Write-Host 'BASE_FOLDER_BROWSE_BINDING=PASS'
-          Write-Host 'AUTO_SUBFOLDER_UI_HINT=PASS'
+          $theme = Get-Content -LiteralPath '.\.release\BridgeX.Hotfix21.Theme.xml' -Raw
+          if ($theme -notmatch 'Editbox Name="InstallFolder"') { throw 'INSTALL_FOLDER_EDITBOX_BINDING=FAIL' }
+          if ($theme -notmatch 'BrowseDirectoryAction VariableName="InstallFolder"') { throw 'INSTALL_FOLDER_BROWSE_BINDING=FAIL' }
+          if ($theme -notmatch 'Checkbox Name="CreateDesktopShortcut"') { throw 'DESKTOP_SHORTCUT_CHECKBOX_BINDING=FAIL' }
+          if ($theme -notmatch 'Checkbox Name="LaunchAfterInstall"') { throw 'LAUNCH_AFTER_INSTALL_CHECKBOX_BINDING=FAIL' }
+          if ($theme -notmatch 'Button Name="LaunchButton"') { throw 'WIX_LAUNCH_BUTTON_BINDING=FAIL' }
+          Write-Host 'INSTALL_FOLDER_UI_BINDING=PASS'
+          Write-Host 'DESKTOP_SHORTCUT_CHECKBOX_BINDING=PASS'
+          Write-Host 'LAUNCH_AFTER_INSTALL_CHECKBOX_BINDING=PASS'
           Write-Host 'INSTALLER_BRANDING_QA=PASS'
           Write-Host 'WIX_INSTALLER_CANDIDATE_QA=PASS'
 
@@ -104,10 +107,9 @@ jobs:
             if ($latest) { $defender = Join-Path $latest.FullName 'MpCmdRun.exe' }
           }
           if (-not (Test-Path -LiteralPath $defender)) { throw 'MICROSOFT_DEFENDER_CLI_MISSING' }
-
           $targets = @(
-            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX.msi'),
-            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe')
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX.msi'),
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe')
           )
           foreach ($target in $targets) {
             $scanOutput = @(& $defender -Scan -ScanType 3 -File $target 2>&1)
@@ -120,31 +122,36 @@ jobs:
             }
           }
 
-      - name: Default markerless migration and runtime QA
+      - name: Default install desktop shortcut and runtime QA
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe'
           $installRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
           $legacySentinel = Join-Path $installRoot 'legacy-file-not-owned-by-wix.txt'
           $installedExe = Join-Path $installRoot 'bin\BridgeX.exe'
+          $desktopCandidates = @(
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'TNSuite BridgeX.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'TNSuite BridgeX.lnk')
+          ) | Select-Object -Unique
 
           if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
+          foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { Remove-Item -LiteralPath $shortcut -Force } }
           New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
           Set-Content -LiteralPath $legacySentinel -Value 'legacy sentinel: installer must preserve this file' -NoNewline
-          Write-Host 'MARKERLESS_LEGACY_FOLDER_PRECONDITION=PASS'
 
-          $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
+          $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart','CreateDesktopShortcut=1','LaunchAfterInstall=0') -Wait -PassThru
           if ($install.ExitCode -notin @(0, 3010)) { throw "DEFAULT_INSTALL=FAIL exit=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $installedExe)) { throw 'DEFAULT_INSTALLED_BRIDGEX_EXE_MISSING' }
           $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
           if ($actualHash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "DEFAULT_INSTALLED_BRIDGEX_HASH=FAIL actual=$actualHash" }
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_INSTALL' }
+          $desktopShortcut = $desktopCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $desktopShortcut) { throw 'DESKTOP_SHORTCUT_DEFAULT_ON=FAIL' }
           Write-Host "DEFAULT_LOCATION_INSTALL=PASS path=$installRoot"
-          Write-Host "INSTALLED_BRIDGEX_HASH=PASS sha256=$actualHash"
+          Write-Host "DESKTOP_SHORTCUT_DEFAULT_ON=PASS path=$desktopShortcut"
 
-          $bin = Split-Path -Parent $installedExe
-          $runtime = Start-Process -FilePath $installedExe -WorkingDirectory $bin -PassThru
+          $runtime = Start-Process -FilePath $installedExe -WorkingDirectory (Split-Path -Parent $installedExe) -PassThru
           Start-Sleep -Seconds 5
           if ($runtime.HasExited) { throw "DEFAULT_RUNTIME_LAUNCH=FAIL exit=$($runtime.ExitCode)" }
           Stop-Process -Id $runtime.Id -Force
@@ -154,45 +161,48 @@ jobs:
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
           if ($uninstall.ExitCode -notin @(0, 3010)) { throw "DEFAULT_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
           if (Test-Path -LiteralPath $installedExe) { throw 'DEFAULT_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
+          foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { throw "DESKTOP_SHORTCUT_REMAINS_AFTER_UNINSTALL=$shortcut" } }
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_UNINSTALL' }
           Remove-Item -LiteralPath $installRoot -Recurse -Force
-          Write-Host 'MARKERLESS_LEGACY_MIGRATION_QA=PASS'
+          Write-Host 'DEFAULT_INSTALL_OPTIONS_QA=PASS'
 
-      - name: Drive and parent-folder auto-subfolder QA
+      - name: Selected drive parent-folder and shortcut-off QA
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe'
           $defaultRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
+          $desktopCandidates = @(
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'TNSuite BridgeX.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'TNSuite BridgeX.lnk')
+          ) | Select-Object -Unique
 
           function Test-BaseLocation([string]$baseLocation, [string]$caseName) {
             $expectedRoot = Join-Path $baseLocation 'TNSuite\BridgeX'
             $installedExe = Join-Path $expectedRoot 'bin\BridgeX.exe'
             $wrongDirectExe = Join-Path $baseLocation 'bin\BridgeX.exe'
             $tnsuiteRoot = Join-Path $baseLocation 'TNSuite'
-
             if (Test-Path -LiteralPath $expectedRoot) { Remove-Item -LiteralPath $expectedRoot -Recurse -Force }
-            if (Test-Path -LiteralPath $wrongDirectExe) { throw "$caseName`_PRECONDITION_WRONG_DIRECT_EXE_PRESENT=$wrongDirectExe" }
             if (Test-Path -LiteralPath $defaultRoot) { Remove-Item -LiteralPath $defaultRoot -Recurse -Force }
+            foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { Remove-Item -LiteralPath $shortcut -Force } }
 
-            $args = @('/quiet','/norestart',("InstallBaseFolder={0}" -f $baseLocation))
+            $args = @('/quiet','/norestart',("InstallFolder={0}" -f $baseLocation),'CreateDesktopShortcut=0','LaunchAfterInstall=0')
             $install = Start-Process -FilePath $setup -ArgumentList $args -Wait -PassThru
             if ($install.ExitCode -notin @(0, 3010)) { throw "$caseName`_INSTALL=FAIL exit=$($install.ExitCode)" }
             if (-not (Test-Path -LiteralPath $installedExe)) { throw "$caseName`_AUTO_SUBFOLDER_MISSING expected=$installedExe" }
             if (Test-Path -LiteralPath $wrongDirectExe) { throw "$caseName`_PAYLOAD_INSTALLED_DIRECTLY_IN_BASE path=$wrongDirectExe" }
-            if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw "$caseName`_IGNORED_BASE_LOCATION" }
-
+            if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw "$caseName`_STILL_INSTALLED_TO_C_DEFAULT" }
+            foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { throw "$caseName`_DESKTOP_SHORTCUT_CREATED_WHEN_DISABLED=$shortcut" } }
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
             if ($hash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "$caseName`_HASH=FAIL actual=$hash" }
             Write-Host "$caseName`_AUTO_SUBFOLDER=PASS base=$baseLocation final=$expectedRoot"
-            Write-Host "$caseName`_HASH=PASS sha256=$hash"
+            Write-Host "$caseName`_DESKTOP_SHORTCUT_OFF=PASS"
 
             $runtime = Start-Process -FilePath $installedExe -WorkingDirectory (Split-Path -Parent $installedExe) -PassThru
             Start-Sleep -Seconds 5
             if ($runtime.HasExited) { throw "$caseName`_RUNTIME=FAIL exit=$($runtime.ExitCode)" }
             Stop-Process -Id $runtime.Id -Force
             $runtime.WaitForExit()
-            Write-Host "$caseName`_RUNTIME=PASS"
 
             $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
             if ($uninstall.ExitCode -notin @(0, 3010)) { throw "$caseName`_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
@@ -208,16 +218,52 @@ jobs:
           New-Item -ItemType Directory -Force -Path $parentBase | Out-Null
           Test-BaseLocation -baseLocation $parentBase -caseName 'PARENT_FOLDER'
           if (Test-Path -LiteralPath $parentBase) { Remove-Item -LiteralPath $parentBase -Recurse -Force }
+          Write-Host 'SELECTED_LOCATION_AND_SHORTCUT_OFF_QA=PASS'
 
-          Write-Host 'AUTO_SUBFOLDER_LOCATION_QA=PASS'
+      - name: Upgrade relocation from prior C install QA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
+          $legacyDist = Join-Path $env:RUNNER_TEMP 'bridgex-hotfix20-legacy'
+          New-Item -ItemType Directory -Force -Path $legacyDist | Out-Null
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix20.ps1 -PortableZip $portable -OutputDirectory $legacyDist | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw 'LEGACY_HOTFIX20_BUILD=FAIL' }
+
+          $oldSetup = Join-Path $legacyDist 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe'
+          $newSetup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe'
+          $oldRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
+          $base = Join-Path $env:RUNNER_TEMP 'BridgeX-Relocated-Base'
+          $newRoot = Join-Path $base 'TNSuite\BridgeX'
+          $newExe = Join-Path $newRoot 'bin\BridgeX.exe'
+          New-Item -ItemType Directory -Force -Path $base | Out-Null
+
+          $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
+          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "LEGACY_HOTFIX20_INSTALL=FAIL exit=$($oldInstall.ExitCode)" }
+          if (-not (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe'))) { throw 'LEGACY_C_INSTALL_PRECONDITION=FAIL' }
+
+          $upgrade = Start-Process -FilePath $newSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
+          if ($upgrade.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION=FAIL exit=$($upgrade.ExitCode)" }
+          if (-not (Test-Path -LiteralPath $newExe)) { throw "UPGRADE_RELOCATION_NEW_PATH_MISSING=$newExe" }
+          if (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe')) { throw 'UPGRADE_RELOCATION_OLD_C_PATH_STILL_HAS_MANAGED_EXE' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $newExe).Hash.ToLowerInvariant()
+          if ($hash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "UPGRADE_RELOCATION_HASH=FAIL actual=$hash" }
+          Write-Host "UPGRADE_RELOCATION_FROM_C=PASS final=$newRoot"
+
+          $uninstall = Start-Process -FilePath $newSetup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
+          if ($uninstall.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if (Test-Path -LiteralPath $newExe) { throw 'UPGRADE_RELOCATION_MANAGED_FILE_REMAINS' }
+          if (Test-Path -LiteralPath $base) { Remove-Item -LiteralPath $base -Recurse -Force }
+          if (Test-Path -LiteralPath $oldRoot) { Remove-Item -LiteralPath $oldRoot -Recurse -Force }
+          Write-Host 'UPGRADE_RELOCATION_QA=PASS'
 
       - name: Upload WiX installer candidate
         uses: actions/upload-artifact@v4
         with:
-          name: bridgex-wix-hotfix20-${{ github.event.pull_request.head.sha }}
+          name: bridgex-wix-hotfix21-${{ github.event.pull_request.head.sha }}
           path: |
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX.msi
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-QA.txt
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX.msi
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-Setup.exe
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX-QA.txt
           if-no-files-found: error
           retention-days: 7
