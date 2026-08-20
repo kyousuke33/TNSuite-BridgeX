@@ -52,8 +52,15 @@ $text = $text.Replace("Write-Host 'WIX_INSTALLER_BUILD=PASS'", "Write-Host 'AUTO
 '@
 
 $source = $source.Replace($anchor, $injection + "`r`n`r`n" + $anchor)
-$tempWrapper = Join-Path $env:RUNNER_TEMP "BridgeX-Hotfix22-Wrapper-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.ps1"
-[System.IO.File]::WriteAllText($tempWrapper, $source, [System.Text.UTF8Encoding]::new($false))
 
-& pwsh.exe -NoLogo -NoProfile -File $tempWrapper -PortableZip $PortableZip -OutputDirectory $OutputDirectory
-if ($LASTEXITCODE -ne 0) { throw "HOTFIX22_WIX_BUILD_FAILED=$LASTEXITCODE" }
+# Keep this generated wrapper beside the project release scripts so its
+# $PSScriptRoot resolves build-wix-installer.ps1 and the Hotfix21 theme assets.
+$tempWrapper = Join-Path $PSScriptRoot ".BridgeX-Hotfix22-Wrapper-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.ps1"
+try {
+    [System.IO.File]::WriteAllText($tempWrapper, $source, [System.Text.UTF8Encoding]::new($false))
+    & pwsh.exe -NoLogo -NoProfile -File $tempWrapper -PortableZip $PortableZip -OutputDirectory $OutputDirectory
+    if ($LASTEXITCODE -ne 0) { throw "HOTFIX22_WIX_BUILD_FAILED=$LASTEXITCODE" }
+}
+finally {
+    if (Test-Path -LiteralPath $tempWrapper) { Remove-Item -LiteralPath $tempWrapper -Force -ErrorAction SilentlyContinue }
+}
