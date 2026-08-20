@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Build12-Hotfix22 auto-close + clean uninstall
+- When install, upgrade or uninstall detects `BridgeX.exe` or `BridgeX-CLI.exe` still running, use the standard WiX Util `CloseApplication` action instead of a project-specific process-kill helper.
+- Send a graceful close message first and wait up to 4 seconds; if the BridgeX process is still running, terminate only that exact executable so managed files can be replaced or removed without a reboot prompt.
+- Set `MSIDISABLERMRESTART=1` so Windows Installer does not independently relaunch an app it closed; the existing **Open TNSuite BridgeX when setup finishes** checkbox remains the only post-install launch authority.
+- Keep `RebootPrompt=no` for BridgeX-owned process locks and add CI acceptance that installs BridgeX, leaves it running, uninstalls it, and requires the process to exit automatically without user interaction.
+- Require clean uninstall of managed application files, Desktop shortcut, Start Menu entry and installer-owned `HKLM\Software\TNSuite\BridgeX` registry values. User profile/settings data is intentionally preserved.
+- Re-run the same auto-close/uninstall acceptance from a custom install location to prevent regression of the Hotfix21 drive/folder selection behavior.
+- Preserve the canonical BridgeX runtime hash, WiX Burn/MSI architecture, installer icon/branding, Desktop shortcut option and finish-launch option.
+- Treat Hotfix22 as new bytes; the exact Hotfix22 Setup SHA-256 must independently pass VirusTotal before promotion.
+- Keep Build13 out of scope.
+
 ## Unreleased — Build12-Hotfix21 installer relocation + finish options
 - Fix the interactive location selector so the UI uses WixStdBA's first-class `InstallFolder` variable rather than a custom variable that did not reliably propagate the user's Browse selection during real installs/upgrades.
 - Keep `InstallFolder` semantics as a **base/parent location** and pass it to MSI `INSTALLBASE`; the final product folder remains automatically authored as `TNSuite\BridgeX` below that base.
