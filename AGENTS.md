@@ -34,3 +34,36 @@ BridgeX pull requests, fork pull requests and external contributor code run only
 
 ## Safety
 Never commit generated installers/portable archives, build caches, local MSYS2/wxWidgets trees, runtime logs, tokens, signing keys or generated QA evidence. Public CI must not receive production/staging/database/signing/release credentials or TNSuite internal tokens. Build once and publish the exact verified artifact. Update checks may fail open for normal app use, but artifact verification must fail closed before execution.
+
+<!-- TNSUITE:RCP-MANAGED-AGENTS:BEGIN -->
+TNSUITE_CENTRAL_AUTHORITY_PREFLIGHT=REQUIRED
+USER_PROMPT_GOVERNANCE_DEPENDENCY=NONE
+PROJECT_LOCAL_CENTRAL_AUTHORITY_WEAKENING=PROHIBITED
+GITHUB_MAIN_CANONICAL_SOURCE=REQUIRED
+PROJECT_MUTATION_SCOPE=SELF_ONLY
+CROSS_PROJECT_MUTATION=PROHIBITED
+CROSS_PROJECT_DEFECT_REQUEST_REQUIRES_PROVEN_OWNERSHIP=REQUIRED
+UNKNOWN_DEFECT_RCP_TRIAGE=REQUIRED
+VALID_EXTERNAL_REQUEST_MUST_BE_REVIEWED=REQUIRED
+RESOLUTION_CALLBACK_TO_REQUESTER=REQUIRED
+REQUESTER_REVALIDATION_AND_AUTO_RESUME=REQUIRED
+CENTRAL_CAPABILITY_GAP_PROJECT_WORKAROUND=PROHIBITED
+CI_HOST_RUNTIME_AUTHORITY=NONE
+BUILD_ONCE_PROMOTE_SAME_ARTIFACT=REQUIRED
+PASS_WITHOUT_REQUIRED_EVIDENCE=PROHIBITED
+TNSUITE_AGENTS_SYNC=RCP_MANAGED
+TNSUITE_AGENTS_POLICY_REVISION=2026-08-20.1
+
+Central managed execution rules:
+1. Before managed implementation, load project-local authority and run the centrally versioned TNSuite Authority Preflight for declared subscriptions.
+2. An agent may mutate only its own repository/project scope. It may inspect other governed repositories read-only when necessary for diagnosis, but must not edit another project to unblock itself.
+3. Create or reuse a governed cross-project defect request only when evidence proves the defect is owned by the target project. The request must identify the requester, blocked work item, observed and expected behavior, exact evidence/source references, ownership rationale, blocking status and required outcome.
+4. When ownership is UNKNOWN or only suspected, do not assign blame or request a fix from another project. Escalate a diagnostic request to RCP. RCP may investigate across relevant projects and central authorities read-only, establish ownership, coalesce related failures and recommend routing, but must not mutate child-project source during triage.
+5. A project receiving a valid external request must independently review the evidence and classify it as ACCEPTED, REJECTED_NOT_OWNED, NEEDS_MORE_EVIDENCE, DUPLICATE or SUPERSEDED. An accepted request that blocks another managed project must be tracked through the receiver's own governed work item, source QA, PR, required CI and safe merge.
+6. After an accepted external request is resolved, publish a resolution callback containing the request id, receiver project, resolution work item/PR, exact resolution source SHA, capability or fix identity and revalidation requirement. The requester must revalidate the original blocked condition before marking the dependency resolved and automatically resume only after that revalidation passes.
+7. When a proven central capability is missing, record or reuse the central dependency and park the child work item without consuming an active lane. Do not build a project-local shadow control plane, duplicated central protocol or workaround that bypasses central authority.
+8. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next phase without waiting for a new user prompt.
+9. Do not treat ordinary source edits, tests, PR creation, required CI, safe merge or phase continuation as human approval gates when canonical authority already defines the work.
+10. Human approval remains required where canonical policy explicitly requires it, including Production promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
+11. Never claim SOURCE_PASS, ARTIFACT_READY, STAGING_PASS, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority.
+<!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
