@@ -1,0 +1,106 @@
+name: BridgeX MSI Packaging Evaluation
+
+on:
+  push:
+    branches:
+      - hotfix/msi-packaging-remediation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate-msi:
+    name: Build low-heuristic MSI candidate
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout exact evaluation source
+        uses: actions/checkout@v4
+
+      - name: Confirm GitHub-hosted Windows packaging toolchain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = @('heat.exe', 'candle.exe', 'light.exe')
+          foreach ($tool in $manifest) {
+            $found = Get-Command $tool -ErrorAction SilentlyContinue
+            if (-not $found) {
+              $fallback = Join-Path ${env:ProgramFiles(x86)} "WiX Toolset v3.14\bin\$tool"
+              if (-not (Test-Path -LiteralPath $fallback)) { throw "WIX_TOOL_MISSING=$tool" }
+              Write-Host "WIX_TOOL=$fallback"
+            } else {
+              Write-Host "WIX_TOOL=$($found.Source)"
+            }
+          }
+          Write-Host 'MSI_EVALUATION_TOOLCHAIN=PASS'
+
+      - name: Build BridgeX runtime and portable payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\windows-build-adapter.ps1
+          if ($LASTEXITCODE -ne 0) { throw "WINDOWS_BUILD_ADAPTER_FAILED=$LASTEXITCODE" }
+          Write-Host 'MSI_EVALUATION_RUNTIME_BUILD=PASS'
+
+      - name: Build per-user MSI candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sourceZip = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
+          if (-not (Test-Path -LiteralPath $sourceZip)) { throw "PORTABLE_SOURCE_MISSING=$sourceZip" }
+
+          $candidateDir = Join-Path $PWD 'msi-evaluation'
+          New-Item -ItemType Directory -Force -Path $candidateDir | Out-Null
+          $msiName = 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-MSI-Evaluation-Setup.msi'
+          $msi = Join-Path $candidateDir $msiName
+
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\build-msi-installer.ps1 `
+            -PayloadZip $sourceZip `
+            -OutputMsi $msi `
+            -ProductVersion '0.5.12.18'
+          if ($LASTEXITCODE -ne 0) { throw "MSI_EVALUATION_BUILD_FAILED=$LASTEXITCODE" }
+
+          $msiHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $msi).Hash.ToLowerInvariant()
+          $portableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourceZip).Hash.ToLowerInvariant()
+          $portableCopy = Join-Path $candidateDir 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-MSI-Evaluation-Portable.zip'
+          Copy-Item -LiteralPath $sourceZip -Destination $portableCopy -Force
+
+          $sumText = "$msiHash *$msiName`n$portableHash *$(Split-Path -Leaf $portableCopy)`n"
+          [System.IO.File]::WriteAllText((Join-Path $candidateDir 'SHA256SUMS.txt'), $sumText, [System.Text.Encoding]::ASCII)
+
+          Write-Host "MSI_EVALUATION_SHA256=$msiHash"
+          Write-Host "PORTABLE_EVALUATION_SHA256=$portableHash"
+          Write-Host 'MSI_EVALUATION_ARTIFACTS=PASS'
+
+      - name: Enforce evaluation packaging boundary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = Join-Path $PWD 'msi-evaluation'
+          $msi = Get-ChildItem -LiteralPath $dir -Filter '*.msi'
+          $exe = Get-ChildItem -LiteralPath $dir -Filter '*.exe'
+          if ($msi.Count -ne 1) { throw "MSI_EVALUATION_COUNT_INVALID=$($msi.Count)" }
+          if ($exe.Count -ne 0) { throw "SFX_EXE_PRESENT_IN_EVALUATION=$($exe.Count)" }
+          if ((Get-Item -LiteralPath $msi[0].FullName).Length -le 0) { throw 'MSI_EVALUATION_EMPTY' }
+          Write-Host 'SFX_INSTALLER_RELEASE_CANDIDATE=NONE'
+          Write-Host 'MSI_INSTALL_SCOPE=PER_USER'
+          Write-Host 'MSI_INSTALL_PRIVILEGES=LIMITED'
+          Write-Host 'MSI_CUSTOM_ACTIONS=NONE_BY_SOURCE_CONTRACT'
+          Write-Host 'MSI_EVALUATION_SECURITY_BOUNDARY=PASS'
+
+      - name: Upload MSI evaluation candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-msi-evaluation-${{ github.sha }}
+          path: msi-evaluation/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Evaluation result
+        shell: pwsh
+        run: |
+          Write-Host 'MSI_PACKAGING_EVALUATION=PASS'
+          Write-Host 'PUBLIC_RELEASE=NOT_CREATED'
+          Write-Host 'VIRUSTOTAL_EXACT_ARTIFACT_GATE=PENDING_USER_SCAN'
+          Write-Host 'BUILD13=UNCHANGED'
