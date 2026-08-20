@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Build12-Hotfix20 base-location installer UX
+- Change installer location semantics from selecting the complete product directory to selecting only a **drive or parent folder**.
+- Add a dedicated Burn `InstallBaseFolder` variable and bind the Options edit box / Browse action to that base location.
+- Add MSI `INSTALLBASE` as a public directory property above the authored `TNSuite\BridgeX` directory tree so the installer automatically creates the product subfolder instead of requiring users to type it.
+- Default behavior remains `C:\Program Files\TNSuite\BridgeX`.
+- Required examples: selecting `D:\` resolves to `D:\TNSuite\BridgeX`; selecting `E:\` resolves to `E:\TNSuite\BridgeX`; selecting `D:\Apps` resolves to `D:\Apps\TNSuite\BridgeX`.
+- Add a custom WiX Standard BA theme that labels the field as a drive/parent-folder selector and explicitly states that `TNSuite\BridgeX` is created automatically.
+- Add CI acceptance for drive-root and nested parent-folder selections, including guards that fail if payload files are installed directly into the selected base folder.
+- Preserve BridgeX Setup EXE icon/branding, canonical BridgeX runtime SHA-256 enforcement, markerless legacy migration behavior and the WiX/Burn + MSI architecture.
+- Treat Hotfix20 as new bytes. Previous VirusTotal results, including Hotfix18 0/70, do not transfer; the exact Hotfix20 Setup SHA-256 must independently reach 0 malicious / 0 suspicious before promotion.
+- Keep Build13 out of scope.
+
 ## Unreleased — Build12-Hotfix19 WiX installer UX
 - Keep the WiX Toolset 6 / Burn + MSI installer architecture after the exact Build12-Hotfix18 Setup SHA-256 `63de8ee9bd53c8e215e45599b52703df4dfde839efdfc3f7c0aef868ebbedb2b` was user-verified at VirusTotal with 0/70 detections.
 - Add the BridgeX application icon to the final Setup EXE and Windows installer product identity, derived from the canonical BridgeX executable rather than introducing unrelated branding assets.
