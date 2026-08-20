@@ -107,3 +107,37 @@ jobs:
     with:
       source_sha: ${{ github.sha }}
       publish_release: false
+
+  report-main-artifact:
+    name: Report canonical main artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.windows-main-build-qa.result == 'success'
+    needs: [windows-main-build-qa]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Write artifact checkpoint to issue 18
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          artifact_name="bridgex-release-${GITHUB_SHA}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          cat > /tmp/bridgex-main-artifact.md <<EOF
+          ## Canonical main Windows artifact available
+
+          \`\`\`text
+          CANONICAL_MAIN_SHA=${GITHUB_SHA}
+          CANONICAL_MAIN_BUILD_RUN_ID=${GITHUB_RUN_ID}
+          CANONICAL_MAIN_BUILD_RUN_URL=${run_url}
+          CANONICAL_MAIN_ARTIFACT=${artifact_name}
+          WINDOWS_MAIN_BUILD_QA=PASS
+          PUBLICATION_PAUSED=YES
+          \`\`\`
+
+          The artifact above is the only Build12-Hotfix17 candidate eligible for SHA-256 / VirusTotal verification and later governed promotion. PR dry-run artifacts are not promotion authority.
+          EOF
+          gh issue comment 18 --repo "$GITHUB_REPOSITORY" --body-file /tmp/bridgex-main-artifact.md
+          echo "CANONICAL_MAIN_ARTIFACT_REPORTED=${artifact_name}"
