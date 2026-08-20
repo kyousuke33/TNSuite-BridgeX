@@ -77,6 +77,14 @@ $bundleRootReplacement = '<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmln
 if (-not $text.Contains($bundleRootNeedle)) { throw 'HOTFIX23_BUNDLE_UTIL_NAMESPACE_PATCH_POINT_MISSING' }
 $text = $text.Replace($bundleRootNeedle, $bundleRootReplacement)
 
+# Patch WixStdBA launch attributes before adding variables containing the same
+# path text, so the variable defaults cannot accidentally be rewritten to self-reference.
+$launchTargetAttributeNeedle = 'LaunchTarget="[InstallFolder]TNSuite\BridgeX\bin\BridgeX.exe"'
+$launchWorkingAttributeNeedle = 'LaunchWorkingFolder="[InstallFolder]TNSuite\BridgeX\bin"'
+if (-not $text.Contains($launchTargetAttributeNeedle) -or -not $text.Contains($launchWorkingAttributeNeedle)) { throw 'HOTFIX23_LAUNCH_PATH_PATCH_POINT_MISSING' }
+$text = $text.Replace($launchTargetAttributeNeedle, 'LaunchTarget="[BridgeXLaunchTarget]"')
+$text = $text.Replace($launchWorkingAttributeNeedle, 'LaunchWorkingFolder="[BridgeXLaunchWorkingFolder]"')
+
 $launchVarNeedle = '    <Variable Name="LaunchAfterInstall" Type="numeric" Value="1" Persisted="no" bal:Overridable="yes" />'
 $stateBlock = $launchVarNeedle + "`r`n" +
     '    <Variable Name="TargetBridgeXMsiVersion" Type="version" Value="0.5.1223" />' + "`r`n" +
@@ -89,20 +97,13 @@ $stateBlock = $launchVarNeedle + "`r`n" +
 if (-not $text.Contains($launchVarNeedle)) { throw 'HOTFIX23_BUNDLE_STATE_PATCH_POINT_MISSING' }
 $text = $text.Replace($launchVarNeedle, $stateBlock)
 
-# Preserve existing custom location during Update/Repair by directly setting the
-# child MSI directory property. Fresh install keeps Hotfix21 base-folder behavior.
-$msiPropertyNeedle = "        <MsiProperty Name=`"INSTALLBASE`" Value=`"[InstallFolder]`" />`r`n        <MsiProperty Name=`"CREATE_DESKTOP_SHORTCUT`" Value=`"[CreateDesktopShortcut]`" />"
-$msiPropertyReplacement = "        <MsiProperty Name=`"INSTALLBASE`" Value=`"[InstallFolder]`" Condition=`"NOT ExistingBridgeXInstallFolder`" />`r`n        <MsiProperty Name=`"INSTALLFOLDER`" Value=`"[ExistingBridgeXInstallFolder]`" Condition=`"ExistingBridgeXInstallFolder`" />`r`n        <MsiProperty Name=`"CREATE_DESKTOP_SHORTCUT`" Value=`"[CreateDesktopShortcut]`" />"
-if (-not $text.Contains($msiPropertyNeedle)) { throw 'HOTFIX23_MSI_LOCATION_PROPERTY_PATCH_POINT_MISSING' }
-$text = $text.Replace($msiPropertyNeedle, $msiPropertyReplacement)
-
-# Finish-launch must also use the detected existing path on Update/Repair rather
-# than reconstructing it from the default C: base variable.
-$launchTargetOld = '[InstallFolder]TNSuite\BridgeX\bin\BridgeX.exe'
-$launchWorkingOld = '[InstallFolder]TNSuite\BridgeX\bin'
-if (-not $text.Contains($launchTargetOld) -or -not $text.Contains($launchWorkingOld)) { throw 'HOTFIX23_LAUNCH_PATH_PATCH_POINT_MISSING' }
-$text = $text.Replace($launchTargetOld, '[BridgeXLaunchTarget]')
-$text = $text.Replace($launchWorkingOld, '[BridgeXLaunchWorkingFolder]')
+# Preserve existing custom location during Update/Repair by patching only the
+# existing INSTALLBASE property line, independent of LF/CRLF normalization.
+$installBasePropertyNeedle = '        <MsiProperty Name="INSTALLBASE" Value="[InstallFolder]" />'
+$installBasePropertyReplacement = '        <MsiProperty Name="INSTALLBASE" Value="[InstallFolder]" Condition="NOT ExistingBridgeXInstallFolder" />' + "`r`n" +
+    '        <MsiProperty Name="INSTALLFOLDER" Value="[ExistingBridgeXInstallFolder]" Condition="ExistingBridgeXInstallFolder" />'
+if (-not $text.Contains($installBasePropertyNeedle)) { throw 'HOTFIX23_MSI_LOCATION_PROPERTY_PATCH_POINT_MISSING' }
+$text = $text.Replace($installBasePropertyNeedle, $installBasePropertyReplacement)
 
 $bundleBuildNeedle = '& wix build -arch x64 -ext WixToolset.BootstrapperApplications.wixext -o $ExePath $BundleWxs'
 $bundleBuildReplacement = '& wix build -arch x64 -ext WixToolset.BootstrapperApplications.wixext -ext WixToolset.Util.wixext -o $ExePath $BundleWxs'
