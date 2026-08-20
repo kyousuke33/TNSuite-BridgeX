@@ -51,7 +51,7 @@ jobs:
           $output = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-Setup.exe'
           $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-QA.txt'
 
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\build-native-installer-canonical.ps1 `
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-native-installer-canonical.ps1 `
             -PortableZip $portable `
             -OutputExe $output 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "NATIVE_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
