@@ -39,7 +39,8 @@ $logoBitmap = New-Object System.Drawing.Bitmap 64,64
 $graphics = [System.Drawing.Graphics]::FromImage($logoBitmap)
 try {
     $graphics.Clear([System.Drawing.Color]::Transparent)
-    $graphics.DrawIcon($BridgeXIcon, 0, 0, 64, 64)
+    $iconRect = New-Object System.Drawing.Rectangle 0,0,64,64
+    $graphics.DrawIcon($BridgeXIcon, $iconRect)
     $logoBitmap.Save($LogoPath, [System.Drawing.Imaging.ImageFormat]::Png)
 }
 finally {
