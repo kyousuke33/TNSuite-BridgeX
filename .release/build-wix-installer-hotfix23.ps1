@@ -48,11 +48,15 @@ $wixRootReplacement = "[void]`$product.AppendLine('<Wix xmlns=`"http://wixtoolse
 if (-not $text.Contains($wixRootNeedle)) { throw 'HOTFIX23_MSI_UTIL_NAMESPACE_PATCH_POINT_MISSING' }
 $text = $text.Replace($wixRootNeedle, $wixRootReplacement)
 
+$forceCloseCommand = '"[System64Folder]cmd.exe" /d /s /c ""[System64Folder]taskkill.exe" /F /T /IM BridgeX.exe >nul 2>&1 & "[System64Folder]taskkill.exe" /F /T /IM BridgeX-CLI.exe >nul 2>&1 & exit /b 0"'
+$forceCloseCommandXml = [System.Security.SecurityElement]::Escape($forceCloseCommand)
+if ([string]::IsNullOrWhiteSpace($forceCloseCommandXml)) { throw 'HOTFIX23_FORCE_CLOSE_COMMAND_ESCAPE_FAILED' }
+
 $upgradeNeedle = "[void]`$product.AppendLine('    <MajorUpgrade DowngradeErrorMessage=`"A newer version of TNSuite BridgeX is already installed.`" />')"
 $upgradeReplacement = $upgradeNeedle + "`r`n" +
     "[void]`$product.AppendLine('    <Property Id=`"MSIDISABLERMRESTART`" Value=`"1`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <Property Id=`"MSIRESTARTMANAGERCONTROL`" Value=`"Disable`" />')" + "`r`n" +
-    "[void]`$product.AppendLine('    <SetProperty Id=`"WixQuietExecCmdLine`" Value=`"&quot;[System64Folder]cmd.exe&quot; /d /s /c &quot;&quot;[System64Folder]taskkill.exe&quot; /F /T /IM BridgeX.exe &gt;nul 2&gt;&amp;1 &amp; &quot;[System64Folder]taskkill.exe&quot; /F /T /IM BridgeX-CLI.exe &gt;nul 2&gt;&amp;1 &amp; exit /b 0&quot;`" Before=`"ForceCloseBridgeX`" Sequence=`"execute`" />')" + "`r`n" +
+    "[void]`$product.AppendLine('    <SetProperty Id=`"WixQuietExecCmdLine`" Value=`"$forceCloseCommandXml`" Before=`"ForceCloseBridgeX`" Sequence=`"execute`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <CustomAction Id=`"ForceCloseBridgeX`" BinaryRef=`"Wix4UtilCA_X64`" DllEntry=`"WixQuietExec`" Execute=`"immediate`" Return=`"ignore`" />')" + "`r`n" +
     "[void]`$product.AppendLine('    <InstallExecuteSequence>')" + "`r`n" +
     "[void]`$product.AppendLine('      <Custom Action=`"ForceCloseBridgeX`" Before=`"InstallValidate`" Condition=`"Installed OR WIX_UPGRADE_DETECTED`" />')" + "`r`n" +
@@ -87,17 +91,10 @@ $text = $text.Replace($launchVarNeedle, $stateBlock)
 
 # Preserve existing custom location during Update/Repair by directly setting the
 # child MSI directory property. Fresh install keeps Hotfix21 base-folder behavior.
-$msiPropertyNeedle = @'
-        <MsiProperty Name="INSTALLBASE" Value="[InstallFolder]" />
-        <MsiProperty Name="CREATE_DESKTOP_SHORTCUT" Value="[CreateDesktopShortcut]" />
-'@
-$msiPropertyReplacement = @'
-        <MsiProperty Name="INSTALLBASE" Value="[InstallFolder]" Condition="NOT ExistingBridgeXInstallFolder" />
-        <MsiProperty Name="INSTALLFOLDER" Value="[ExistingBridgeXInstallFolder]" Condition="ExistingBridgeXInstallFolder" />
-        <MsiProperty Name="CREATE_DESKTOP_SHORTCUT" Value="[CreateDesktopShortcut]" />
-'@
-if (-not $text.Contains($msiPropertyNeedle.Trim())) { throw 'HOTFIX23_MSI_LOCATION_PROPERTY_PATCH_POINT_MISSING' }
-$text = $text.Replace($msiPropertyNeedle.Trim(), $msiPropertyReplacement.Trim())
+$msiPropertyNeedle = "        <MsiProperty Name=`"INSTALLBASE`" Value=`"[InstallFolder]`" />`r`n        <MsiProperty Name=`"CREATE_DESKTOP_SHORTCUT`" Value=`"[CreateDesktopShortcut]`" />"
+$msiPropertyReplacement = "        <MsiProperty Name=`"INSTALLBASE`" Value=`"[InstallFolder]`" Condition=`"NOT ExistingBridgeXInstallFolder`" />`r`n        <MsiProperty Name=`"INSTALLFOLDER`" Value=`"[ExistingBridgeXInstallFolder]`" Condition=`"ExistingBridgeXInstallFolder`" />`r`n        <MsiProperty Name=`"CREATE_DESKTOP_SHORTCUT`" Value=`"[CreateDesktopShortcut]`" />"
+if (-not $text.Contains($msiPropertyNeedle)) { throw 'HOTFIX23_MSI_LOCATION_PROPERTY_PATCH_POINT_MISSING' }
+$text = $text.Replace($msiPropertyNeedle, $msiPropertyReplacement)
 
 # Finish-launch must also use the detected existing path on Update/Repair rather
 # than reconstructing it from the default C: base variable.
