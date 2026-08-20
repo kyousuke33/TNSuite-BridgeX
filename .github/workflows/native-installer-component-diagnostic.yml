@@ -53,17 +53,17 @@ jobs:
           $fileSql = 'SELECT `File`,`Component_`,`FileName` FROM `File`'
           $fileView = $db.OpenView($fileSql)
           $fileView.Execute()
-          $matches = @()
+          $fileRows = @()
           while ($rec = $fileView.Fetch()) {
             $fileKey = $rec.StringData(1)
             $componentKey = $rec.StringData(2)
             $fileName = $rec.StringData(3)
-            if ($fileName -match '(^|\|)BridgeX\.exe$') {
-              $matches += [pscustomobject]@{ FileKey=$fileKey; ComponentKey=$componentKey; FileName=$fileName }
+            if ([regex]::IsMatch($fileName, '(^|\|)BridgeX\.exe$')) {
+              $fileRows += [pscustomobject]@{ FileKey=$fileKey; ComponentKey=$componentKey; FileName=$fileName }
             }
           }
-          if ($matches.Count -ne 1) { throw "BRIDGEX_FILE_ROW_COUNT=$($matches.Count)" }
-          $componentKey = $matches[0].ComponentKey.Replace("'", "''")
+          if ($fileRows.Count -ne 1) { throw "BRIDGEX_FILE_ROW_COUNT=$($fileRows.Count)" }
+          $componentKey = $fileRows[0].ComponentKey.Replace("'", "''")
           $componentSql = "SELECT ``ComponentId``,``Directory_``,``KeyPath`` FROM ``Component`` WHERE ``Component``='$componentKey'"
           $componentView = $db.OpenView($componentSql)
           $componentView.Execute()
@@ -72,8 +72,8 @@ jobs:
           $componentGuid = $componentRec.StringData(1)
           $directoryId = $componentRec.StringData(2)
           $keyPath = $componentRec.StringData(3)
-          Write-Host "BRIDGEX_FILE_KEY=$($matches[0].FileKey)"
-          Write-Host "BRIDGEX_COMPONENT_KEY=$($matches[0].ComponentKey)"
+          Write-Host "BRIDGEX_FILE_KEY=$($fileRows[0].FileKey)"
+          Write-Host "BRIDGEX_COMPONENT_KEY=$($fileRows[0].ComponentKey)"
           Write-Host "BRIDGEX_COMPONENT_GUID=$componentGuid"
           Write-Host "BRIDGEX_COMPONENT_DIRECTORY=$directoryId"
           Write-Host "BRIDGEX_COMPONENT_KEYPATH=$keyPath"
