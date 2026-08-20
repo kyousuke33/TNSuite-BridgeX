@@ -81,7 +81,7 @@ $headerLines.Add('static const PayloadEntry kPayload[] = {')
 $rcLines = [System.Collections.Generic.List[string]]::new()
 $rcLines.Add('#include <windows.h>')
 $iconRc = ($Icon -replace '\\','/')
-$rcLines.Add("101 ICON `"$iconRc`")
+$rcLines.Add(('101 ICON "{0}"' -f $iconRc))
 $rcLines.Add('1 VERSIONINFO')
 $rcLines.Add(' FILEVERSION 0,5,12,18')
 $rcLines.Add(' PRODUCTVERSION 0,5,12,18')
@@ -114,9 +114,9 @@ $id = 2000
 foreach ($file in $files) {
     $relative = [System.IO.Path]::GetRelativePath($Payload, $file.FullName).Replace('/', '\')
     $escapedRelative = $relative.Replace('\', '\\').Replace('"', '\"')
-    $headerLines.Add("    {$id, L`"$escapedRelative`"},")
+    $headerLines.Add(('    {{{0}, L"{1}"}},' -f $id, $escapedRelative))
     $resourcePath = ($file.FullName -replace '\\','/').Replace('"', '\"')
-    $rcLines.Add("$id RCDATA `"$resourcePath`")
+    $rcLines.Add(('{0} RCDATA "{1}"' -f $id, $resourcePath))
     $id++
 }
 $headerLines.Add('};')
