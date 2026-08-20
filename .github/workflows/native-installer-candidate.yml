@@ -1,4 +1,4 @@
-name: BridgeX Native Installer Candidate
+name: BridgeX WiX Installer Candidate
 
 on:
   pull_request:
@@ -9,11 +9,12 @@ permissions:
   actions: read
 
 jobs:
-  native-installer:
+  wix-installer:
     runs-on: windows-latest
     env:
       CANONICAL_ARTIFACT_ID: '9405996175'
       CANONICAL_SOURCE_SHA: '5c9d70673d9b5da4a4878c9ce548077f0ef67539'
+      WIX_VERSION: '6.0.0'
     steps:
       - name: Checkout exact PR source
         uses: actions/checkout@v4
@@ -39,35 +40,72 @@ jobs:
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
           Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
-          Write-Host "NATIVE_INSTALLER_RUNTIME_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
-          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE=CANONICAL_MAIN_ARTIFACT'
-          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE_QA=PASS'
+          Write-Host "WIX_INSTALLER_RUNTIME_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
+          Write-Host 'WIX_INSTALLER_RUNTIME_SOURCE=CANONICAL_MAIN_ARTIFACT'
+          Write-Host 'WIX_INSTALLER_RUNTIME_SOURCE_QA=PASS'
 
-      - name: Build native resource-based installer candidate
+      - name: Install pinned WiX Toolset
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install --global wix --version $env:WIX_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "WIX_TOOL_INSTALL_FAILED=$LASTEXITCODE" }
+          wix --version
+          wix extension add -g "WixToolset.BootstrapperApplications.wixext/$env:WIX_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw "WIX_BOOTSTRAPPER_EXTENSION_INSTALL_FAILED=$LASTEXITCODE" }
+          Write-Host "WIX_VERSION_PINNED=$env:WIX_VERSION"
+          Write-Host 'WIX_TOOLCHAIN_QA=PASS'
+
+      - name: Build WiX MSI and single-file EXE bundle
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          $output = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-Setup.exe'
-          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-QA.txt'
+          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-QA.txt'
 
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-native-installer-canonical.ps1 `
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer.ps1 `
             -PortableZip $portable `
-            -OutputExe $output 2>&1 | Tee-Object -FilePath $qa
-          if ($LASTEXITCODE -ne 0) { throw "NATIVE_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
+            -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
+          if ($LASTEXITCODE -ne 0) { throw "WIX_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
 
-          if (-not (Test-Path -LiteralPath $output)) { throw 'NATIVE_INSTALLER_OUTPUT_MISSING' }
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash.ToLowerInvariant()
-          "NATIVE_INSTALLER_FINAL_SHA256=$hash" | Tee-Object -FilePath $qa -Append
-          "NATIVE_INSTALLER_FILE_SIZE=$((Get-Item -LiteralPath $output).Length)" | Tee-Object -FilePath $qa -Append
-          Write-Host 'NATIVE_INSTALLER_CANDIDATE_QA=PASS'
+          $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe'
+          foreach ($artifact in @($msi, $setup)) {
+            if (-not (Test-Path -LiteralPath $artifact)) { throw "WIX_ARTIFACT_MISSING=$artifact" }
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact).Hash.ToLowerInvariant()
+            "ARTIFACT_SHA256 file=$([System.IO.Path]::GetFileName($artifact)) sha256=$hash" | Tee-Object -FilePath $qa -Append
+          }
+          Write-Host 'WIX_INSTALLER_CANDIDATE_QA=PASS'
 
-      - name: Upload native installer candidate
+      - name: Microsoft Defender exact artifact scan
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $defender = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          if (-not (Test-Path -LiteralPath $defender)) {
+            $platformRoot = Join-Path $env:ProgramData 'Microsoft\Windows Defender\Platform'
+            $latest = Get-ChildItem -LiteralPath $platformRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
+            if ($latest) { $defender = Join-Path $latest.FullName 'MpCmdRun.exe' }
+          }
+          if (-not (Test-Path -LiteralPath $defender)) { throw 'MICROSOFT_DEFENDER_CLI_MISSING' }
+
+          $targets = @(
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi'),
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe')
+          )
+          foreach ($target in $targets) {
+            & $defender -Scan -ScanType 3 -File $target
+            if ($LASTEXITCODE -ne 0) { throw "MICROSOFT_DEFENDER_EXACT_SCAN=FAIL file=$target exit=$LASTEXITCODE" }
+            Write-Host "MICROSOFT_DEFENDER_EXACT_SCAN=PASS file=$([System.IO.Path]::GetFileName($target))"
+          }
+
+      - name: Upload WiX installer candidate
         uses: actions/upload-artifact@v4
         with:
-          name: bridgex-native-installer-${{ github.event.pull_request.head.sha }}
+          name: bridgex-wix-installer-${{ github.event.pull_request.head.sha }}
           path: |
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-Setup.exe
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-QA.txt
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-QA.txt
           if-no-files-found: error
           retention-days: 7
