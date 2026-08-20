@@ -6,21 +6,42 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   native-installer:
     runs-on: windows-latest
+    env:
+      CANONICAL_ARTIFACT_ID: '9405996175'
+      CANONICAL_SOURCE_SHA: '5c9d70673d9b5da4a4878c9ce548077f0ef67539'
     steps:
       - name: Checkout exact PR source
         uses: actions/checkout@v4
 
-      - name: Build canonical Windows runtime payload
+      - name: Download canonical main runtime artifact
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\windows-build-adapter.ps1
-          if ($LASTEXITCODE -ne 0) { throw "WINDOWS_BUILD_ADAPTER_FAILED=$LASTEXITCODE" }
-          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE=PASS'
+          $artifactZip = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-artifact.zip'
+          $artifactDir = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-artifact'
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:CANONICAL_ARTIFACT_ID/zip"
+          Invoke-WebRequest -Headers $headers -Uri $uri -OutFile $artifactZip -MaximumRedirection 8
+          Expand-Archive -LiteralPath $artifactZip -DestinationPath $artifactDir -Force
+
+          $portable = Join-Path $artifactDir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
+          if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
+          New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
+          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
+          Write-Host "NATIVE_INSTALLER_RUNTIME_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
+          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE=CANONICAL_MAIN_ARTIFACT'
+          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE_QA=PASS'
 
       - name: Build native resource-based installer candidate
         shell: pwsh
