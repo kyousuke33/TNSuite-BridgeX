@@ -100,8 +100,8 @@ Set-ExactReplacement -Path $BuildPipeline `
     -New '-DPRODUCT_VERSION="0.5-Build12-Hotfix17"' `
     -ExpectedCount 2 -Marker 'REMEDIATION_PRODUCT_VERSION_PIPELINE'
 Set-ExactReplacement -Path $BuildWrapper `
-    -Old "$BuildName = 'TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full'" `
-    -New "$BuildName = 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full'" `
+    -Old '$BuildName = ''TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full''' `
+    -New '$BuildName = ''TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full''' `
     -ExpectedCount 1 -Marker 'REMEDIATION_BUILD_NAME_WRAPPER'
 
 Set-ExactReplacement -Path $InstallerSource `
