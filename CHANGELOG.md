@@ -4,6 +4,8 @@
 - Revoke acceptance of the published Build12-Hotfix16 Windows release after VirusTotal reported heuristic detections on the installer artifact.
 - Pause automatic GitHub Release publication while installer packaging is remediated and re-verified.
 - Withdraw the flagged Hotfix16 GitHub Release and its release tag without mutating or replacing the published artifact bytes.
+- Remove the installer/uninstaller PowerShell helper, `ExecutionPolicy Bypass` invocation and automatic process termination behavior.
+- Replace solid LZMA NSIS packing with standard zlib compression to reduce heuristic-sensitive installer behavior while keeping marker-verified, fail-closed upgrade/uninstall handling.
 - Clarify README wording for SHA-256 verification, exact-artifact VirusTotal reports and optional portable downloads.
 - Keep Build13 out of scope; the corrected installer must use a new immutable Build12 hotfix release identity.
 
