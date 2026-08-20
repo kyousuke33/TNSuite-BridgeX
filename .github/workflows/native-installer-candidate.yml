@@ -48,10 +48,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          $output = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-Setup.exe'
-          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-QA.txt'
+          $output = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-Setup.exe'
+          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-QA.txt'
 
-          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\build-native-installer.ps1 `
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\build-native-installer-canonical.ps1 `
             -PortableZip $portable `
             -OutputExe $output 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "NATIVE_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
@@ -67,7 +67,7 @@ jobs:
         with:
           name: bridgex-native-installer-${{ github.event.pull_request.head.sha }}
           path: |
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-Setup.exe
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-QA.txt
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-Setup.exe
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller03-Native-QA.txt
           if-no-files-found: error
           retention-days: 7
