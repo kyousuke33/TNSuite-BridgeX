@@ -50,7 +50,8 @@ jobs:
           $installer = New-Object -ComObject WindowsInstaller.Installer
           $db = $installer.OpenDatabase($msi, 0)
 
-          $fileView = $db.OpenView("SELECT `File`,`Component_`,`FileName` FROM `File`")
+          $fileSql = 'SELECT `File`,`Component_`,`FileName` FROM `File`'
+          $fileView = $db.OpenView($fileSql)
           $fileView.Execute()
           $matches = @()
           while ($rec = $fileView.Fetch()) {
@@ -63,7 +64,8 @@ jobs:
           }
           if ($matches.Count -ne 1) { throw "BRIDGEX_FILE_ROW_COUNT=$($matches.Count)" }
           $componentKey = $matches[0].ComponentKey.Replace("'", "''")
-          $componentView = $db.OpenView("SELECT `ComponentId`,`Directory_`,`KeyPath` FROM `Component` WHERE `Component`='$componentKey'")
+          $componentSql = "SELECT ``ComponentId``,``Directory_``,``KeyPath`` FROM ``Component`` WHERE ``Component``='$componentKey'"
+          $componentView = $db.OpenView($componentSql)
           $componentView.Execute()
           $componentRec = $componentView.Fetch()
           if (-not $componentRec) { throw 'BRIDGEX_COMPONENT_ROW_MISSING' }
