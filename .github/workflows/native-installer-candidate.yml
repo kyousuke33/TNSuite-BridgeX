@@ -1,0 +1,52 @@
+name: BridgeX Native Installer Candidate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  native-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@v4
+
+      - name: Build canonical Windows runtime payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\windows-build-adapter.ps1
+          if ($LASTEXITCODE -ne 0) { throw "WINDOWS_BUILD_ADAPTER_FAILED=$LASTEXITCODE" }
+          Write-Host 'NATIVE_INSTALLER_RUNTIME_SOURCE=PASS'
+
+      - name: Build native resource-based installer candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
+          $output = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-Setup.exe'
+          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-QA.txt'
+
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\build-native-installer.ps1 `
+            -PortableZip $portable `
+            -OutputExe $output 2>&1 | Tee-Object -FilePath $qa
+          if ($LASTEXITCODE -ne 0) { throw "NATIVE_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
+
+          if (-not (Test-Path -LiteralPath $output)) { throw 'NATIVE_INSTALLER_OUTPUT_MISSING' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $output).Hash.ToLowerInvariant()
+          "NATIVE_INSTALLER_FINAL_SHA256=$hash" | Tee-Object -FilePath $qa -Append
+          "NATIVE_INSTALLER_FILE_SIZE=$((Get-Item -LiteralPath $output).Length)" | Tee-Object -FilePath $qa -Append
+          Write-Host 'NATIVE_INSTALLER_CANDIDATE_QA=PASS'
+
+      - name: Upload native installer candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-native-installer-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-Setup.exe
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-RuntimeCompleteInstaller02-Native-QA.txt
+          if-no-files-found: error
+          retention-days: 7
