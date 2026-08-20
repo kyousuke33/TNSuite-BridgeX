@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Build12-Hotfix21 installer relocation + finish options
+- Fix the interactive location selector so the UI uses WixStdBA's first-class `InstallFolder` variable rather than a custom variable that did not reliably propagate the user's Browse selection during real installs/upgrades.
+- Keep `InstallFolder` semantics as a **base/parent location** and pass it to MSI `INSTALLBASE`; the final product folder remains automatically authored as `TNSuite\BridgeX` below that base.
+- Default remains `C:\Program Files\TNSuite\BridgeX`; selecting `D:\` resolves to `D:\TNSuite\BridgeX`, selecting `E:\` resolves to `E:\TNSuite\BridgeX`, and selecting `D:\Apps` resolves to `D:\Apps\TNSuite\BridgeX`.
+- Add a default-on **Create a Desktop shortcut** checkbox in installer Options, propagated to MSI as `CREATE_DESKTOP_SHORTCUT`; when unchecked the Desktop shortcut component is not installed.
+- Add a default-on **Open TNSuite BridgeX when setup finishes** checkbox on the success page. When checked, the Finish action uses WixStdBA's standard `LaunchButton`/`LaunchTarget`; when unchecked, Finish closes without launching.
+- Add upgrade-relocation QA: install Hotfix20 at the default C: location, then upgrade with Hotfix21 targeting a different base folder and require the managed BridgeX executable to move to the new location instead of remaining under C:.
+- Add shortcut-on / shortcut-off / uninstall cleanup QA and retain canonical BridgeX runtime SHA-256 enforcement, icon/branding, markerless legacy migration, WiX Burn/MSI architecture and no custom self-extractor/packer/obfuscation.
+- Treat Hotfix21 as new bytes; prior VirusTotal 0/70 evidence does not transfer. The exact Hotfix21 Setup SHA-256 must independently reach 0 malicious / 0 suspicious before promotion.
+- Keep Build13 out of scope.
+
 ## Unreleased — Build12-Hotfix20 base-location installer UX
 - Change installer location semantics from selecting the complete product directory to selecting only a **drive or parent folder**.
 - Add a dedicated Burn `InstallBaseFolder` variable and bind the Options edit box / Browse action to that base location.
