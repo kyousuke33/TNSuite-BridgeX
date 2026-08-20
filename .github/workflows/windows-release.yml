@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       publish_release:
-        description: Publish GitHub Release after successful build and acceptance
+        description: Legacy publication switch; must remain false while verified-artifact promotion is enforced
         required: true
         type: boolean
 
@@ -29,8 +29,8 @@ jobs:
           $request = Get-Content '.release/release-request.json' -Raw | ConvertFrom-Json
           if ($request.schema -ne 'tnsuite.bridgex.release-request.v1') { throw 'RELEASE_REQUEST_SCHEMA_INVALID' }
           if ($request.channel -ne 'github-releases') { throw 'RELEASE_CHANNEL_INVALID' }
-          if ($request.tag -ne 'v0.5-Build12-Hotfix16') { throw 'RELEASE_TAG_INVALID' }
-          if ($request.build_name -ne 'TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full') { throw 'BUILD_NAME_INVALID' }
+          if ($request.tag -ne 'v0.5-Build12-Hotfix17') { throw 'RELEASE_TAG_INVALID' }
+          if ($request.build_name -ne 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full') { throw 'BUILD_NAME_INVALID' }
           if ($request.rcp_profile -ne 'tnsuite.public-desktop-github-release.v1') { throw 'RCP_RELEASE_PROFILE_INVALID' }
           if ($request.rcp_authority_sha -notmatch '^[0-9a-f]{40}$') { throw 'RCP_AUTHORITY_SHA_INVALID' }
 
@@ -46,37 +46,21 @@ jobs:
           "RCP_RELEASE_PROFILE=$($request.rcp_profile)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RCP_AUTHORITY_SHA=$($request.rcp_authority_sha)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "BRIDGEX_SOURCE_SHA=$sourceSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host 'REMEDIATION_RELEASE_IDENTITY=Build12-Hotfix17'
+          Write-Host 'WITHDRAWN_HOTFIX16_IDENTITY_REUSED=NO'
 
       - name: Determine execution mode
         id: plan
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           if ('${{ inputs.publish_release }}' -eq 'true') {
-            gh release view $env:BRIDGEX_RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
-            $releaseExists = ($LASTEXITCODE -eq 0)
-            # `gh release view` returns 1 when the release does not exist. That is
-            # an expected branch condition here, not a workflow failure. Consume
-            # the native exit code so GitHub's pwsh wrapper does not fail the step.
-            $global:LASTEXITCODE = 0
-            if ($releaseExists) {
-              'build=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Host 'GITHUB_RELEASE_ALREADY_EXISTS=PASS'
-            }
-            else {
-              'build=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              'publish=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Host 'GITHUB_RELEASE_REQUIRED=YES'
-            }
+            throw 'DIRECT_PUBLICATION_DISABLED_USE_VERIFIED_ARTIFACT_PROMOTION'
           }
-          else {
-            'build=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            Write-Host 'WINDOWS_RELEASE_MODE=DRY_RUN'
-          }
+          'build=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host 'WINDOWS_RELEASE_MODE=BUILD_EVIDENCE_ONLY'
+          Write-Host 'PUBLICATION_PAUSED=YES'
 
       - name: Build Windows installer and portable archive
         if: steps.plan.outputs.build == 'true'
@@ -101,6 +85,18 @@ jobs:
           if (-not (Test-Path -LiteralPath $setup)) { throw "INSTALLER_MISSING=$setup" }
           if (-not (Test-Path -LiteralPath $portable)) { throw "PORTABLE_MISSING=$portable" }
 
+          $withdrawnSetup = Join-Path $PWD 'dist\TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe'
+          $withdrawnPortable = Join-Path $PWD 'dist\TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip'
+          if ((Test-Path -LiteralPath $withdrawnSetup) -or (Test-Path -LiteralPath $withdrawnPortable)) {
+            throw 'WITHDRAWN_HOTFIX16_ARTIFACT_RECREATED'
+          }
+
+          $setupVersion = (Get-Item -LiteralPath $setup).VersionInfo.FileVersion
+          if ($setupVersion -ne '0.5.12.17') {
+            throw "INSTALLER_FILE_VERSION_MISMATCH=$setupVersion"
+          }
+          Write-Host 'INSTALLER_FILE_VERSION_QA=PASS version=0.5.12.17'
+
           Copy-Item -LiteralPath $setup -Destination $assets
           Copy-Item -LiteralPath $portable -Destination $assets
 
@@ -115,55 +111,54 @@ jobs:
           Write-Host "PORTABLE_SHA256=$portableHash"
           Write-Host 'RELEASE_ASSET_SHA256=PASS'
 
-      - name: Governed desktop publication acceptance
-        if: steps.plan.outputs.publish == 'true'
-        shell: bash
-        env:
-          BRIDGEX_TRIGGER_EVENT: ${{ github.event_name }}
-          BRIDGEX_TRIGGER_BRANCH: ${{ github.ref_name }}
-          BRIDGEX_SETUP: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe
-          BRIDGEX_PORTABLE: release-assets/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
-          BRIDGEX_SHA256_FILE: release-assets/SHA256SUMS.txt
-        run: bash .release/production-acceptance.sh
-
       - name: Write release notes
         if: steps.plan.outputs.build == 'true'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $hashLines = Get-Content 'release-assets/SHA256SUMS.txt'
-          $notes = @"
-          # TNSuite BridgeX v0.5 Build12-Hotfix16
+          if ($hashLines.Count -ne 2) { throw "SHA256_LINE_COUNT_INVALID=$($hashLines.Count)" }
 
-          **File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**
+          $notesLines = @(
+            '# TNSuite BridgeX v0.5 Build12-Hotfix17',
+            '',
+            '**File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**',
+            '',
+            'Build12-Hotfix17 là bản sửa lỗi đóng gói installer sau khi Build12-Hotfix16 bị thu hồi. Artifact ở bước này chỉ là bằng chứng build và chưa được phát hành công khai.',
+            '',
+            '## Tệp build',
+            '',
+            "- **Installer:** $env:BUILD_NAME-Setup.exe",
+            "- **Portable:** $env:BUILD_NAME.zip",
+            '- **Checksum:** SHA256SUMS.txt',
+            '',
+            '## Có gì trong bản này',
+            '',
+            '- Dark Mode / Light Mode;',
+            '- ghi nhớ giao diện đã chọn;',
+            '- English / Tiếng Việt;',
+            '- SFTP / truyền tệp;',
+            '- Windows installer và portable build;',
+            '- CLI automation/SFTP có phạm vi giới hạn;',
+            '- installer không còn nhúng/chạy PowerShell helper hoặc tự động terminate BridgeX;',
+            '- installer dùng NSIS zlib thay cho solid LZMA.',
+            '',
+            '## SHA-256',
+            ''
+          )
+          foreach ($line in $hashLines) {
+            $notesLines += "    $line"
+          }
+          $notesLines += ''
+          $notesLines += '**VirusTotal:** chờ kiểm tra lại đúng artifact từ protected main trước khi phát hành.'
+          $notesLines += ''
+          $notesLines += "**Source:** $env:BRIDGEX_SOURCE_SHA"
+          $notesLines += ''
+          $notesLines += '> BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.'
 
-          Đây là binary release đầu tiên của BridgeX dành cho Windows x64. Dự án được chia sẻ miễn phí và mã nguồn mở.
-
-          ## Tải xuống
-
-          - **Installer:** `$env:BUILD_NAME-Setup.exe`
-          - **Portable:** `$env:BUILD_NAME.zip`
-          - **Checksum:** `SHA256SUMS.txt`
-
-          ## Có gì trong bản này
-
-          - Dark Mode / Light Mode;
-          - ghi nhớ giao diện đã chọn;
-          - English / Tiếng Việt;
-          - SFTP / truyền tệp;
-          - Windows installer và portable build;
-          - CLI automation/SFTP có phạm vi giới hạn.
-
-          ## SHA-256
-
-          ```text
-          $($hashLines -join "`n")
-          ```
-
-          **Source:** `$env:BRIDGEX_SOURCE_SHA`
-
-          > BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.
-          "@
+          $notes = [string]::Join("`n", $notesLines) + "`n"
           [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes, [System.Text.UTF8Encoding]::new($false))
+          Write-Host 'RELEASE_NOTES_RENDER_QA=PASS'
 
       - name: Upload build evidence artifact
         if: steps.plan.outputs.build == 'true'
@@ -177,29 +172,12 @@ jobs:
           retention-days: 30
 
       - name: Dry-run result
-        if: steps.plan.outputs.build == 'true' && !inputs.publish_release
+        if: steps.plan.outputs.build == 'true'
         shell: pwsh
         run: |
           Write-Host 'WINDOWS_RELEASE_DRY_RUN=PASS'
-          Write-Host 'GITHUB_RELEASE_PUBLISHED=NOT_RUN_DRY_RUN'
-          Write-Host 'PRODUCTION_HOST_ACCESS=NONE'
-          Write-Host 'DATABASE_EXECUTION=NOT_PERFORMED'
-
-      - name: Publish GitHub Release
-        if: steps.plan.outputs.publish == 'true'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create $env:BRIDGEX_RELEASE_TAG `
-            "release-assets/$env:BUILD_NAME-Setup.exe#Windows x64 installer" `
-            "release-assets/$env:BUILD_NAME.zip#Windows x64 portable" `
-            "release-assets/SHA256SUMS.txt#SHA-256 checksums" `
-            --repo $env:GITHUB_REPOSITORY `
-            --target $env:BRIDGEX_SOURCE_SHA `
-            --title $env:BRIDGEX_RELEASE_TITLE `
-            --notes-file release-notes.md
-          if ($LASTEXITCODE -ne 0) { throw "GITHUB_RELEASE_CREATE_FAILED=$LASTEXITCODE" }
-          Write-Host 'GITHUB_RELEASE_PUBLISHED=PASS'
+          Write-Host 'GITHUB_RELEASE_PUBLISHED=NOT_RUN_SECURITY_GATE'
+          Write-Host 'PUBLICATION_PAUSED=YES'
+          Write-Host 'VIRUSTOTAL_EXACT_ARTIFACT_GATE=PENDING'
           Write-Host 'PRODUCTION_HOST_ACCESS=NONE'
           Write-Host 'DATABASE_EXECUTION=NOT_PERFORMED'
