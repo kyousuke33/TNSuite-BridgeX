@@ -15,6 +15,12 @@ foreach ($required in @($basePath, $themePath, $localizationPath)) {
     if (-not (Test-Path -LiteralPath $required)) { throw "HOTFIX20_REQUIRED_FILE_MISSING=$required" }
 }
 
+# The final WiX builder runs as a generated temporary script. Resolve custom
+# theme resources here, then inject literal paths into that generated script;
+# wrapper-local variables are not visible inside the child PowerShell process.
+$themeXmlLiteral = [System.Security.SecurityElement]::Escape((Resolve-Path -LiteralPath $themePath).Path)
+$localizationXmlLiteral = [System.Security.SecurityElement]::Escape((Resolve-Path -LiteralPath $localizationPath).Path)
+
 $text = Get-Content -LiteralPath $basePath -Raw -Encoding UTF8
 $text = $text.Replace("TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX", "TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX")
 $text = $text.Replace("`$MsiVersion = '0.5.1218'", "`$MsiVersion = '0.5.1220'")
@@ -57,14 +63,16 @@ if (-not (Test-Path -LiteralPath $IconPath) -or -not (Test-Path -LiteralPath $Lo
 }
 $IconXml = XmlEscape $IconPath
 $LogoXml = XmlEscape $LogoPath
-$ThemeXml = XmlEscape $themePath
-$LocalizationXml = XmlEscape $localizationPath
+$ThemeXml = '__HOTFIX20_THEME_XML__'
+$LocalizationXml = '__HOTFIX20_LOCALIZATION_XML__'
 Write-Host 'INSTALLER_ICON_SOURCE=BRIDGEX_EXE'
 Write-Host 'INSTALLER_LOGO_SOURCE=BRIDGEX_EXE'
 Write-Host 'INSTALLER_THEME=HOTFIX20_BASE_FOLDER_SELECTION'
 
 $files = @(Get-ChildItem -LiteralPath $PayloadRoot -File -Recurse | Sort-Object FullName)
 '@
+$brandingBlock = $brandingBlock.Replace('__HOTFIX20_THEME_XML__', $themeXmlLiteral)
+$brandingBlock = $brandingBlock.Replace('__HOTFIX20_LOCALIZATION_XML__', $localizationXmlLiteral)
 if (-not $text.Contains($filesNeedle.TrimStart("`r","`n"))) { throw 'PATCH_POINT_FILES_NOT_FOUND' }
 $text = $text.Replace($filesNeedle.TrimStart("`r","`n"), $brandingBlock.TrimStart("`r","`n"))
 
