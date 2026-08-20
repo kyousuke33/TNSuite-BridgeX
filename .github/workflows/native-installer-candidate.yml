@@ -77,7 +77,7 @@ jobs:
           }
           Write-Host 'WIX_INSTALLER_CANDIDATE_QA=PASS'
 
-      - name: Microsoft Defender exact artifact scan
+      - name: Microsoft Defender scan request
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -94,10 +94,61 @@ jobs:
             (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe')
           )
           foreach ($target in $targets) {
-            & $defender -Scan -ScanType 3 -File $target
-            if ($LASTEXITCODE -ne 0) { throw "MICROSOFT_DEFENDER_EXACT_SCAN=FAIL file=$target exit=$LASTEXITCODE" }
-            Write-Host "MICROSOFT_DEFENDER_EXACT_SCAN=PASS file=$([System.IO.Path]::GetFileName($target))"
+            $scanOutput = @(& $defender -Scan -ScanType 3 -File $target 2>&1)
+            $scanOutput | ForEach-Object { Write-Host $_ }
+            if ($LASTEXITCODE -ne 0) { throw "MICROSOFT_DEFENDER_SCAN_REQUEST=FAIL file=$target exit=$LASTEXITCODE" }
+            if (($scanOutput -join "`n") -match 'was skipped') {
+              Write-Host "MICROSOFT_DEFENDER_SCAN_RESULT=NOT_VERIFIED_SKIPPED file=$([System.IO.Path]::GetFileName($target))"
+            } else {
+              Write-Host "MICROSOFT_DEFENDER_SCAN_RESULT=NO_THREAT_REPORTED file=$([System.IO.Path]::GetFileName($target))"
+            }
           }
+
+      - name: Markerless legacy-folder install and runtime QA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe'
+          $installRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
+          $legacySentinel = Join-Path $installRoot 'legacy-file-not-owned-by-wix.txt'
+          $oldMarker = Join-Path $installRoot '.tnsuite-bridgex-install'
+          $installedExe = Join-Path $installRoot 'bin\BridgeX.exe'
+          $expectedHash = '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
+
+          if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+          Set-Content -LiteralPath $legacySentinel -Value 'legacy sentinel: installer must preserve this file' -NoNewline
+          if (Test-Path -LiteralPath $oldMarker) { throw 'TEST_PRECONDITION_FAILED_MARKER_PRESENT' }
+          Write-Host 'MARKERLESS_LEGACY_FOLDER_PRECONDITION=PASS'
+
+          $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
+          if ($install.ExitCode -notin @(0, 3010)) { throw "WIX_BUNDLE_INSTALL=FAIL exit=$($install.ExitCode)" }
+          Write-Host "WIX_BUNDLE_INSTALL=PASS exit=$($install.ExitCode)"
+
+          if (-not (Test-Path -LiteralPath $installedExe)) { throw 'INSTALLED_BRIDGEX_EXE_MISSING' }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw "INSTALLED_BRIDGEX_HASH=FAIL expected=$expectedHash actual=$actualHash" }
+          Write-Host "INSTALLED_BRIDGEX_HASH=PASS sha256=$actualHash"
+          if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_INSTALL' }
+          Write-Host 'LEGACY_UNOWNED_FILE_PRESERVED_ON_INSTALL=PASS'
+
+          $bin = Split-Path -Parent $installedExe
+          $runtime = Start-Process -FilePath $installedExe -WorkingDirectory $bin -PassThru
+          Start-Sleep -Seconds 5
+          if ($runtime.HasExited) { throw "BRIDGEX_RUNTIME_LAUNCH=FAIL exit=$($runtime.ExitCode)" }
+          Write-Host 'BRIDGEX_RUNTIME_LAUNCH=PASS process_alive_after_5s'
+          Stop-Process -Id $runtime.Id -Force
+          $runtime.WaitForExit()
+
+          $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
+          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "WIX_BUNDLE_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          Write-Host "WIX_BUNDLE_UNINSTALL=PASS exit=$($uninstall.ExitCode)"
+          if (Test-Path -LiteralPath $installedExe) { throw 'WIX_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
+          if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_UNINSTALL' }
+          Write-Host 'LEGACY_UNOWNED_FILE_PRESERVED_ON_UNINSTALL=PASS'
+
+          Remove-Item -LiteralPath $installRoot -Recurse -Force
+          Write-Host 'MARKERLESS_LEGACY_MIGRATION_QA=PASS'
 
       - name: Upload WiX installer candidate
         uses: actions/upload-artifact@v4
