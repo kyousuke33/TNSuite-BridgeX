@@ -63,7 +63,7 @@ jobs:
           $setup = Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix22-WiX-Setup.exe'
           if (-not (Test-Path -LiteralPath $setup)) { throw 'HOTFIX22_BASELINE_SETUP_MISSING' }
 
-      - name: Build Hotfix23 installer
+      - name: Build and statically validate Hotfix23 installer
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -80,22 +80,55 @@ jobs:
             "ARTIFACT_SHA256 file=$([IO.Path]::GetFileName($artifact)) sha256=$hash" | Tee-Object -FilePath $qa -Append
           }
 
+          $qaText = Get-Content -LiteralPath $qa -Raw
+          if ($qaText -match 'WIX1150') { throw 'UNSUPPORTED_WIX_BINDER_SYMBOL_WARNING_WIX1150' }
+          foreach ($marker in @(
+            'MAINTENANCE_STATE_DETECTION=PRODUCT_SEARCH',
+            'EXISTING_INSTALL_PATH_DETECTION=MSI_COMPONENT_SEARCH',
+            'EXISTING_INSTALL_PATH_COMPONENT={492A8EAC-6707-51E3-9723-967A6E4A94D9}',
+            'PRE_INSTALLVALIDATE_AUTO_CLOSE_BRIDGEX=ENABLED',
+            'AUTO_CLOSE_TARGETS=BridgeX.exe,BridgeX-CLI.exe',
+            'RESTART_MANAGER=DISABLED',
+            'INSTALL_BASE_MIGRATION=MSI_COMPONENT_DIRECTORY'
+          )) {
+            if (-not $qaText.Contains($marker)) { throw "HOTFIX23_BUILD_MARKER_MISSING=$marker" }
+          }
+
           $theme = Get-Content -LiteralPath '.\.release\BridgeX.Hotfix23.Theme.xml' -Raw
           foreach ($required in @(
             'DetectedBridgeXMsiVersion',
             'TargetBridgeXMsiVersion',
             'InstallUpdateButton',
             'Button Name="RepairButton"',
-            'Button Name="UninstallButton"'
+            'Button Name="UninstallButton"',
+            'VisibleCondition="NOT WixStdBASuppressOptionsUI AND NOT (DetectedBridgeXMsiVersion'
           )) {
             if ($theme -notmatch [regex]::Escape($required)) { throw "MAINTENANCE_THEME_BINDING_MISSING=$required" }
           }
           Write-Host 'MAINTENANCE_THEME_INSTALL_UPDATE_REPAIR_UNINSTALL=PASS'
+          Write-Host 'UPDATE_LOCATION_CHANGE_UI=LOCKED'
+          Write-Host 'WIX1150=NONE'
 
       - name: Upgrade Hotfix22 to Hotfix23 and preserve selected location
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          function Invoke-SetupWithTimeout {
+            param(
+              [Parameter(Mandatory=$true)][string]$FilePath,
+              [Parameter(Mandatory=$true)][string[]]$ArgumentList,
+              [int]$TimeoutSeconds = 180
+            )
+            $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              throw "SETUP_UI_TIMEOUT_POSSIBLE_FILES_IN_USE_DIALOG pid=$($process.Id)"
+            }
+            $process.Refresh()
+            return $process.ExitCode
+          }
+
           $oldSetup = Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix22-WiX-Setup.exe'
           $newSetup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix23-WiX-Setup.exe'
           $defaultRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
@@ -109,28 +142,49 @@ jobs:
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
           if ($oldInstall.ExitCode -notin @(0,3010)) { throw "HOTFIX22_INSTALL_FAILED=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HOTFIX22_CUSTOM_LOCATION_MISSING' }
+          if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'HOTFIX22_CUSTOM_LOCATION_PRECONDITION_FELL_BACK_TO_C' }
 
           $app = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
           Start-Sleep -Seconds 3
           if ($app.HasExited) { throw 'UPDATE_RUNNING_APP_PRECONDITION_FAIL' }
 
           $log = Join-Path $env:RUNNER_TEMP 'Hotfix23-update.log'
-          $update = Start-Process -FilePath $newSetup -ArgumentList @('/quiet','/norestart','LaunchAfterInstall=0','/log',("`"{0}`"" -f $log)) -Wait -PassThru
-          if ($update.ExitCode -ne 0) { throw "HOTFIX23_UPDATE_FAILED_OR_REBOOT_REQUIRED=$($update.ExitCode)" }
+          $updateExit = Invoke-SetupWithTimeout -FilePath $newSetup -ArgumentList @('/passive','/norestart','LaunchAfterInstall=0','/log',("`"{0}`"" -f $log))
+          if ($updateExit -ne 0) { throw "HOTFIX23_UPDATE_FAILED_OR_REBOOT_REQUIRED=$updateExit" }
+
           $app.Refresh()
-          if (-not $app.HasExited) { throw 'UPDATE_DID_NOT_AUTO_CLOSE_RUNNING_BRIDGEX' }
+          if (-not $app.HasExited) { throw 'UPDATE_DID_NOT_FORCE_CLOSE_RUNNING_BRIDGEX' }
           if (-not (Test-Path -LiteralPath $exe)) { throw "UPDATE_DID_NOT_PRESERVE_CUSTOM_LOCATION expected=$exe" }
           if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'UPDATE_FELL_BACK_TO_C_DEFAULT' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
           if ($hash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "UPDATED_RUNTIME_HASH_FAIL=$hash" }
+
           Write-Host 'OLDER_VERSION_DETECTED_AND_UPDATED=PASS'
           Write-Host "UPDATE_PRESERVED_CUSTOM_LOCATION=PASS path=$root"
-          Write-Host 'UPDATE_RUNNING_BRIDGEX_AUTO_CLOSED=PASS'
+          Write-Host 'UPDATE_RUNNING_BRIDGEX_FORCE_CLOSED=PASS'
+          Write-Host 'UPDATE_FILES_IN_USE_MODAL=NONE'
+          Write-Host 'UPDATE_REBOOT_REQUIRED=NO'
 
       - name: Same-version repair closes app and uninstall cleans managed install
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          function Invoke-SetupWithTimeout {
+            param(
+              [Parameter(Mandatory=$true)][string]$FilePath,
+              [Parameter(Mandatory=$true)][string[]]$ArgumentList,
+              [int]$TimeoutSeconds = 180
+            )
+            $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+              Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+              throw "SETUP_UI_TIMEOUT_POSSIBLE_FILES_IN_USE_DIALOG pid=$($process.Id)"
+            }
+            $process.Refresh()
+            return $process.ExitCode
+          }
+
           $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix23-WiX-Setup.exe'
           $base = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix23-UpgradeBase'
           $root = Join-Path $base 'TNSuite\BridgeX'
@@ -140,19 +194,25 @@ jobs:
           $app = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
           Start-Sleep -Seconds 3
           if ($app.HasExited) { throw 'REPAIR_RUNNING_APP_PRECONDITION_FAIL' }
-          $repair = Start-Process -FilePath $setup -ArgumentList @('/repair','/quiet','/norestart','LaunchAfterInstall=0') -Wait -PassThru
-          if ($repair.ExitCode -ne 0) { throw "REPAIR_FAILED_OR_REBOOT_REQUIRED=$($repair.ExitCode)" }
+
+          $repairLog = Join-Path $env:RUNNER_TEMP 'Hotfix23-repair.log'
+          $repairExit = Invoke-SetupWithTimeout -FilePath $setup -ArgumentList @('/repair','/passive','/norestart','LaunchAfterInstall=0','/log',("`"{0}`"" -f $repairLog))
+          if ($repairExit -ne 0) { throw "REPAIR_FAILED_OR_REBOOT_REQUIRED=$repairExit" }
           $app.Refresh()
-          if (-not $app.HasExited) { throw 'REPAIR_DID_NOT_AUTO_CLOSE_RUNNING_BRIDGEX' }
+          if (-not $app.HasExited) { throw 'REPAIR_DID_NOT_FORCE_CLOSE_RUNNING_BRIDGEX' }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'REPAIR_REMOVED_RUNTIME_UNEXPECTEDLY' }
+          if (Test-Path -LiteralPath (Join-Path $env:ProgramFiles 'TNSuite\BridgeX\bin\BridgeX.exe')) { throw 'REPAIR_FELL_BACK_TO_C_DEFAULT' }
           Write-Host 'SAME_VERSION_REPAIR=PASS'
-          Write-Host 'REPAIR_RUNNING_BRIDGEX_AUTO_CLOSED=PASS'
+          Write-Host 'REPAIR_RUNNING_BRIDGEX_FORCE_CLOSED=PASS'
+          Write-Host 'REPAIR_FILES_IN_USE_MODAL=NONE'
 
           $app2 = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
           Start-Sleep -Seconds 3
           if ($app2.HasExited) { throw 'UNINSTALL_RUNNING_APP_PRECONDITION_FAIL' }
-          $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -ne 0) { throw "UNINSTALL_FAILED_OR_REBOOT_REQUIRED=$($uninstall.ExitCode)" }
+
+          $uninstallLog = Join-Path $env:RUNNER_TEMP 'Hotfix23-uninstall.log'
+          $uninstallExit = Invoke-SetupWithTimeout -FilePath $setup -ArgumentList @('/uninstall','/passive','/norestart','/log',("`"{0}`"" -f $uninstallLog))
+          if ($uninstallExit -ne 0) { throw "UNINSTALL_FAILED_OR_REBOOT_REQUIRED=$uninstallExit" }
           $app2.Refresh()
           if (-not $app2.HasExited) { throw 'UNINSTALL_DID_NOT_FORCE_CLOSE_RUNNING_BRIDGEX' }
           if (Test-Path -LiteralPath $exe) { throw 'MANAGED_EXE_REMAINS_AFTER_UNINSTALL' }
@@ -160,10 +220,13 @@ jobs:
           if (Test-Path -LiteralPath $root) {
             $remaining = @(Get-ChildItem -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue)
             if ($remaining.Count -gt 0) { throw "INSTALL_ROOT_NOT_CLEAN remaining=$($remaining.Count)" }
+            Remove-Item -LiteralPath $root -Force -ErrorAction SilentlyContinue
           }
           if (Test-Path -LiteralPath $base) { Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue }
+
           Write-Host 'SAME_VERSION_UNINSTALL=PASS'
           Write-Host 'UNINSTALL_RUNNING_BRIDGEX_FORCE_CLOSED=PASS'
+          Write-Host 'UNINSTALL_FILES_IN_USE_MODAL=NONE'
           Write-Host 'MANAGED_INSTALL_CLEANUP=PASS'
           Write-Host 'REBOOT_REQUIRED=NO'
 
