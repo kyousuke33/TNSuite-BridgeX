@@ -1,13 +1,16 @@
 # Changelog
 
-## Unreleased — Build12-Hotfix23 state-aware maintenance + pre-MSI close
+## Unreleased — Build12-Hotfix23 state-aware maintenance + locked update location
 - Detect the highest installed BridgeX MSI version by the stable product UpgradeCode before rendering WixStdBA maintenance UX.
 - First install remains **Install**; launching a newer Setup over an older BridgeX installation presents **Update**; launching the same installed Setup uses the standard **Repair / Uninstall** Modify page.
-- Move BridgeX process shutdown to the Burn bundle layer so `BridgeX.exe` and `BridgeX-CLI.exe` are asked to close before the MSI begins replacing/removing files; after a 3-second graceful timeout only those exact BridgeX executables may be terminated.
-- Keep an MSI-level `CloseApplication` fallback, `MSIDISABLERMRESTART=1`, `RebootPrompt=no`, no wildcard `taskkill`, no external process-kill helper and no user-facing restart path for normal BridgeX-owned file locks.
-- Persist `InstallBase`, final `InstallLocation` and installed MSI version under `HKLM\Software\TNSuite\BridgeX` for subsequent upgrade generations; future setups use the persisted base location when available.
-- Add acceptance for Hotfix22 → Hotfix23 update while BridgeX is running, custom-location preservation, same-version repair while running, same-version uninstall while running, forced process exit, managed-file cleanup and zero reboot-required exit codes.
-- Preserve the canonical BridgeX runtime SHA-256, WiX Burn/MSI architecture, install-location selector, automatic `TNSuite\BridgeX` subfolder, Desktop shortcut option, installer icon/branding and finish-launch option.
+- Recover the exact existing BridgeX installation directory from Windows Installer component registration using the stable root `COPYING` component GUID `{492A8EAC-6707-51E3-9723-967A6E4A94D9}`. Updates and repairs pass that directory directly as `INSTALLFOLDER`, preventing custom D:/E: installations from falling back to C:.
+- Hide the location Options control while a lower installed version is being updated. Location selection remains available for fresh installs, where the selected base still automatically creates `TNSuite\BridgeX`.
+- Disable Windows Installer Restart Manager for BridgeX maintenance and run a hidden pre-`InstallValidate` WixQuietExec command that force-closes only `BridgeX.exe` and `BridgeX-CLI.exe`. No external helper executable or PowerShell runtime is shipped for process termination.
+- Remove the unsupported Burn-level `util:CloseApplication` approach after WiX 6 emitted `WIX1150` binder warnings for those Bundle symbols; Hotfix23 CI now fails if any `WIX1150` warning returns.
+- Add passive-mode timeout acceptance so any interactive **Files In Use** dialog becomes an automatic CI failure instead of being masked by `/quiet` execution.
+- Add runtime acceptance for Hotfix22 → Hotfix23 update while BridgeX is running, custom-location preservation, same-version repair while running, same-version uninstall while running, forced process exit, managed-file cleanup and zero reboot-required exit codes.
+- Preserve the canonical BridgeX runtime SHA-256, WiX Burn/MSI architecture, fresh-install location selector, automatic `TNSuite\BridgeX` subfolder, Desktop shortcut option, installer icon/branding and finish-launch option.
+- User profile/settings data remains outside managed uninstall cleanup and is intentionally preserved.
 - Treat Hotfix23 as new bytes; the exact Hotfix23 Setup SHA-256 must independently pass VirusTotal before promotion.
 - Keep Build13 out of scope.
 
