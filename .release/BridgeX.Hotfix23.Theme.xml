@@ -33,7 +33,7 @@
             <Hypertext Name="EulaHyperlink" X="11" Y="-107" Width="-11" Height="17" TabStop="yes" FontId="3" HideWhenDisabled="yes">#(loc.InstallLicenseLinkText)</Hypertext>
             <Label Name="InstallVersion" X="11" Y="-73" Width="300" Height="17" FontId="3" DisablePrefix="yes" VisibleCondition="WixStdBAShowVersion">#(loc.InstallVersion)</Label>
             <Checkbox Name="EulaAcceptCheckbox" X="-11" Y="-41" Width="260" Height="17" TabStop="yes" FontId="3" HideWhenDisabled="yes">#(loc.InstallAcceptCheckbox)</Checkbox>
-            <Button Name="OptionsButton" X="-171" Y="-11" Width="75" Height="23" TabStop="yes" FontId="0" VisibleCondition="NOT WixStdBASuppressOptionsUI"><Text>#(loc.InstallOptionsButton)</Text><ChangePageAction Page="Options" /></Button>
+            <Button Name="OptionsButton" X="-171" Y="-11" Width="75" Height="23" TabStop="yes" FontId="0" VisibleCondition="NOT WixStdBASuppressOptionsUI AND NOT (DetectedBridgeXMsiVersion &gt; v0.0.0.0 AND DetectedBridgeXMsiVersion &lt; TargetBridgeXMsiVersion)"><Text>#(loc.InstallOptionsButton)</Text><ChangePageAction Page="Options" /></Button>
             <Button Name="InstallButton" X="-91" Y="-11" Width="75" Height="23" TabStop="yes" FontId="0" ElevationShieldCondition='(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = "PerMachine")'>
                 <Text Condition="DetectedBridgeXMsiVersion &gt; v0.0.0.0 AND DetectedBridgeXMsiVersion &lt; TargetBridgeXMsiVersion">#(loc.InstallUpdateButton)</Text>
                 <Text Condition="NOT (DetectedBridgeXMsiVersion &gt; v0.0.0.0 AND DetectedBridgeXMsiVersion &lt; TargetBridgeXMsiVersion)">#(loc.InstallInstallButton)</Text>
