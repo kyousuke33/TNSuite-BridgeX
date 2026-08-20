@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Build12-Hotfix23 state-aware maintenance + pre-MSI close
+- Detect the highest installed BridgeX MSI version by the stable product UpgradeCode before rendering WixStdBA maintenance UX.
+- First install remains **Install**; launching a newer Setup over an older BridgeX installation presents **Update**; launching the same installed Setup uses the standard **Repair / Uninstall** Modify page.
+- Move BridgeX process shutdown to the Burn bundle layer so `BridgeX.exe` and `BridgeX-CLI.exe` are asked to close before the MSI begins replacing/removing files; after a 3-second graceful timeout only those exact BridgeX executables may be terminated.
+- Keep an MSI-level `CloseApplication` fallback, `MSIDISABLERMRESTART=1`, `RebootPrompt=no`, no wildcard `taskkill`, no external process-kill helper and no user-facing restart path for normal BridgeX-owned file locks.
+- Persist `InstallBase`, final `InstallLocation` and installed MSI version under `HKLM\Software\TNSuite\BridgeX` for subsequent upgrade generations; future setups use the persisted base location when available.
+- Add acceptance for Hotfix22 → Hotfix23 update while BridgeX is running, custom-location preservation, same-version repair while running, same-version uninstall while running, forced process exit, managed-file cleanup and zero reboot-required exit codes.
+- Preserve the canonical BridgeX runtime SHA-256, WiX Burn/MSI architecture, install-location selector, automatic `TNSuite\BridgeX` subfolder, Desktop shortcut option, installer icon/branding and finish-launch option.
+- Treat Hotfix23 as new bytes; the exact Hotfix23 Setup SHA-256 must independently pass VirusTotal before promotion.
+- Keep Build13 out of scope.
+
 ## Unreleased — Build12-Hotfix22 auto-close + clean uninstall
 - When install, upgrade or uninstall detects `BridgeX.exe` or `BridgeX-CLI.exe` still running, use the standard WiX Util `CloseApplication` action instead of a project-specific process-kill helper.
 - Send a graceful close message first and wait up to 4 seconds; if the BridgeX process is still running, terminate only that exact executable so managed files can be replaced or removed without a reboot prompt.
