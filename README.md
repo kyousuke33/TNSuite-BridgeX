@@ -15,21 +15,25 @@ BridgeX được phát triển độc lập từ **FileZilla Client 3.70.6**. Đ
 
 ## Tải xuống
 
-Bản cài đặt chính thức sẽ được phát hành tại:
+Các bản phát hành Windows chính thức được cung cấp tại:
 
 **[GitHub Releases →](https://github.com/kyousuke33/TNSuite-BridgeX/releases)**
 
-Hiện repository chưa publish binary release đầu tiên. Baseline phát triển hiện tại là **v0.5 Build12-Hotfix16**.
+Bản **v0.5 Build12-Hotfix16** đã bị thu hồi và không còn được xem là bản phân phối hợp lệ.
 
-Khi có release, mỗi file tải sẽ kèm thông tin kiểm tra ngay trên trang phát hành, ví dụ:
+Với mỗi tệp phát hành, trang **Releases** sẽ công bố **SHA-256** để bạn đối chiếu tính toàn vẹn của tệp đã tải. Khi có báo cáo VirusTotal cho đúng SHA-256 của tệp đó, trang phát hành sẽ kèm liên kết đến báo cáo tương ứng.
+
+Ví dụ:
 
 ```text
 TNSuiteBridgeX-vX.X.X-Setup.exe
 SHA-256: ...
-VirusTotal: Xem kết quả quét
+VirusTotal: Xem báo cáo quét
 ```
 
-Bản portable `.zip` cũng sẽ được phát hành tại **Releases** khi phiên bản đó có cung cấp.
+Kết quả VirusTotal là thông tin tham khảo từ nhiều công cụ quét và không thay thế việc đối chiếu SHA-256 với bản phát hành chính thức.
+
+Bản portable `.zip` sẽ được đăng trong cùng mục **Releases** khi phiên bản đó có cung cấp bản portable.
 
 ## BridgeX có gì khác?
 
@@ -67,11 +71,11 @@ Ngôn ngữ đã chọn được lưu lại giữa các lần khởi động.
 
 ## Cài đặt
 
-Khi release đầu tiên được publish:
+Khi có bản phát hành khả dụng:
 
 1. mở **[Releases](https://github.com/kyousuke33/TNSuite-BridgeX/releases)**;
-2. tải file cài đặt của phiên bản mới nhất;
-3. nếu muốn kiểm tra trước khi chạy, đối chiếu SHA-256 và mở kết quả VirusTotal ngay trong release;
+2. tải tệp phù hợp của phiên bản mới nhất;
+3. đối chiếu SHA-256 trước khi chạy; nếu release có liên kết VirusTotal, bạn có thể mở báo cáo của đúng tệp để tham khảo thêm;
 4. chạy installer và sử dụng BridgeX như một ứng dụng Windows thông thường.
 
 Nếu không muốn cài đặt, hãy dùng bản portable khi release đó có cung cấp.
