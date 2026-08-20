@@ -9,7 +9,6 @@ root=Path(sys.argv[1]).resolve()
 patch=(root/'scripts/patch_tnsuite_bridgex.py').read_text(encoding='utf-8')
 build=(root/'scripts/build-filezilla-dark.sh').read_text(encoding='utf-8')
 installer=(root/'installer/TNSuiteBridgeXInstaller.nsi').read_text(encoding='utf-8')
-helper=(root/'installer/BridgeX-CloseInstalled.ps1').read_text(encoding='utf-8')
 po=(root/'locales/bridgex_vi_VN.po').read_text(encoding='utf-8')
 checks=[]
 def check(label, ok):
@@ -35,11 +34,10 @@ check('Install marker written', 'FileOpen $0 "$INSTDIR\\${BRIDGEX_INSTALL_MARKER
 check('Uninstall marker guard', 'IfFileExists "$INSTDIR\\${BRIDGEX_INSTALL_MARKER}" uninstall_marker_ok' in installer)
 check('Uninstall full tree with reboot fallback', 'SetOutPath "$TEMP"' in installer and 'RMDir /r /REBOOTOK "$INSTDIR"' in installer)
 check('Uninstall keeps AppData', 'Preserve user settings/site profiles under %APPDATA%' in installer)
-check('Exact-path process helper embedded/invoked', 'BridgeX-CloseInstalled.ps1' in installer and '"$INSTDIR\\bin\\BridgeX.exe"' in installer and '"$TEMP\\BridgeX-CloseInstalled.ps1"' in installer)
-check('Close helper not persisted in install root', '"$INSTDIR\\BridgeX-CloseInstalled.ps1"' not in installer)
-check('Helper exact path match', '.Path' in helper and '[System.IO.Path]::GetFullPath($path) -ieq $target' in helper)
-check('Helper graceful close with bounded kill fallback', 'CloseMainWindow()' in helper and 'WaitForExit(3000)' in helper and '$process.Kill()' in helper)
-check('Helper has no broad process kill', 'Stop-Process -Name' not in helper and 'taskkill' not in helper.lower())
+check('Installer has no embedded close helper', 'BridgeX-CloseInstalled.ps1' not in installer)
+check('Installer has no PowerShell execution or policy bypass', 'powershell.exe' not in installer.lower() and 'executionpolicy bypass' not in installer.lower())
+check('Installer avoids solid LZMA packing', 'SetCompressor zlib' in installer and 'SetCompressor /SOLID lzma' not in installer)
+check('Locked upgrade fails closed instead of terminating processes', 'Close BridgeX and any process using its files' in installer and 'No mixed-version install was created.' in installer and 'Abort' in installer)
 
 check('Branded installer/uninstaller MUI art wired', all(x in installer for x in ('MUI_WELCOMEFINISHPAGE_BITMAP','MUI_UNWELCOMEFINISHPAGE_BITMAP','MUI_HEADERIMAGE_BITMAP','MUI_HEADERIMAGE_UNBITMAP')))
 check('Installer/uninstaller details hidden', 'ShowInstDetails hide' in installer and 'ShowUninstDetails hide' in installer)
