@@ -15,7 +15,7 @@ fail() {
 [[ "${BRIDGEX_SOURCE_SHA:-}" == "${GITHUB_SHA:-}" ]] || fail "SOURCE_SHA_MISMATCH"
 [[ "${RCP_RELEASE_PROFILE:-}" == "tnsuite.public-desktop-github-release.v1" ]] || fail "RCP_RELEASE_PROFILE_MISMATCH"
 [[ "${RCP_AUTHORITY_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "RCP_AUTHORITY_SHA_INVALID"
-[[ "${BRIDGEX_RELEASE_TAG:-}" == "v0.5-Build12-Hotfix16" ]] || fail "RELEASE_TAG_MISMATCH"
+[[ "${BRIDGEX_RELEASE_TAG:-}" == "v0.5-Build12-Hotfix17" ]] || fail "RELEASE_TAG_MISMATCH"
 
 for file in "${BRIDGEX_SETUP:-}" "${BRIDGEX_PORTABLE:-}" "${BRIDGEX_SHA256_FILE:-}"; do
   [[ -n "$file" && -s "$file" ]] || fail "RELEASE_ASSET_MISSING"

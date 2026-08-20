@@ -1,0 +1,334 @@
+name: BridgeX Promote Verified Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact protected-main source SHA that produced the artifact
+        required: true
+        type: string
+      build_run_id:
+        description: Successful protected-main BridgeX Governance Gates run ID
+        required: true
+        type: string
+      installer_sha256:
+        description: SHA-256 of the exact canonical-main installer
+        required: true
+        type: string
+      portable_sha256:
+        description: SHA-256 of the exact canonical-main portable ZIP
+        required: true
+        type: string
+      installer_virustotal_url:
+        description: VirusTotal URL for the exact installer SHA-256
+        required: true
+        type: string
+      portable_virustotal_url:
+        description: VirusTotal URL for the exact portable SHA-256
+        required: true
+        type: string
+      installer_virustotal_malicious:
+        description: VirusTotal malicious engine count for installer; must be 0
+        required: true
+        default: '0'
+        type: string
+      installer_virustotal_suspicious:
+        description: VirusTotal suspicious engine count for installer; must be 0
+        required: true
+        default: '0'
+        type: string
+      portable_virustotal_malicious:
+        description: VirusTotal malicious engine count for portable; must be 0
+        required: true
+        default: '0'
+        type: string
+      portable_virustotal_suspicious:
+        description: VirusTotal suspicious engine count for portable; must be 0
+        required: true
+        default: '0'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: Promote exact verified artifact
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout exact source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Validate protected-main source and build run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: |
+          set -euo pipefail
+
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'PROMOTION_SOURCE_SHA=FAIL'; exit 42; }
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]] || { echo 'PROMOTION_BUILD_RUN_ID=FAIL'; exit 42; }
+
+          request_tag="$(jq -r '.tag' .release/release-request.json)"
+          request_title="$(jq -r '.title' .release/release-request.json)"
+          request_build="$(jq -r '.build_name' .release/release-request.json)"
+          request_profile="$(jq -r '.rcp_profile' .release/release-request.json)"
+          request_authority="$(jq -r '.rcp_authority_sha' .release/release-request.json)"
+
+          [[ "$request_tag" == 'v0.5-Build12-Hotfix17' ]] || { echo "PROMOTION_TAG=FAIL actual=$request_tag"; exit 42; }
+          [[ "$request_title" == 'TNSuite BridgeX v0.5 Build12-Hotfix17' ]] || { echo 'PROMOTION_TITLE=FAIL'; exit 42; }
+          [[ "$request_build" == 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full' ]] || { echo 'PROMOTION_BUILD_NAME=FAIL'; exit 42; }
+          [[ "$request_profile" == 'tnsuite.public-desktop-github-release.v1' ]] || { echo 'PROMOTION_RCP_PROFILE=FAIL'; exit 42; }
+          [[ "$request_authority" =~ ^[0-9a-f]{40}$ ]] || { echo 'PROMOTION_RCP_AUTHORITY=FAIL'; exit 42; }
+
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
+            echo 'PROMOTION_CANONICAL_MAIN_SOURCE=FAIL reason=SOURCE_NOT_ON_MAIN'
+            exit 42
+          }
+
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID")"
+          run_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          run_event="$(jq -r '.event' <<<"$run_json")"
+          run_branch="$(jq -r '.head_branch' <<<"$run_json")"
+          run_conclusion="$(jq -r '.conclusion' <<<"$run_json")"
+          run_name="$(jq -r '.name' <<<"$run_json")"
+
+          [[ "$run_sha" == "$SOURCE_SHA" ]] || { echo "PROMOTION_RUN_SOURCE=FAIL actual=$run_sha"; exit 42; }
+          [[ "$run_event" == 'push' ]] || { echo "PROMOTION_RUN_EVENT=FAIL actual=$run_event"; exit 42; }
+          [[ "$run_branch" == 'main' ]] || { echo "PROMOTION_RUN_BRANCH=FAIL actual=$run_branch"; exit 42; }
+          [[ "$run_conclusion" == 'success' ]] || { echo "PROMOTION_RUN_CONCLUSION=FAIL actual=$run_conclusion"; exit 42; }
+          [[ "$run_name" == 'BridgeX Governance Gates' ]] || { echo "PROMOTION_RUN_NAME=FAIL actual=$run_name"; exit 42; }
+
+          if gh release view 'v0.5-Build12-Hotfix16' --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'WITHDRAWN_HOTFIX16_RELEASE_PRESENT=FAIL'
+            exit 42
+          fi
+          if git ls-remote --exit-code --tags origin 'refs/tags/v0.5-Build12-Hotfix16' >/dev/null 2>&1; then
+            echo 'WITHDRAWN_HOTFIX16_TAG_PRESENT=FAIL'
+            exit 42
+          fi
+          if gh release view "$request_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'PROMOTION_TARGET_RELEASE_ALREADY_EXISTS=FAIL'
+            exit 42
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$request_tag" >/dev/null 2>&1; then
+            echo 'PROMOTION_TARGET_TAG_ALREADY_EXISTS=FAIL'
+            exit 42
+          fi
+
+          echo "BRIDGEX_RELEASE_TAG=$request_tag" >> "$GITHUB_ENV"
+          echo "BRIDGEX_RELEASE_TITLE=$request_title" >> "$GITHUB_ENV"
+          echo "BUILD_NAME=$request_build" >> "$GITHUB_ENV"
+          echo "BRIDGEX_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "RCP_RELEASE_PROFILE=$request_profile" >> "$GITHUB_ENV"
+          echo "RCP_AUTHORITY_SHA=$request_authority" >> "$GITHUB_ENV"
+          echo 'CANONICAL_MAIN_SOURCE=PASS'
+          echo 'CANONICAL_MAIN_BUILD_RUN=PASS'
+          echo 'WITHDRAWN_HOTFIX16_IDENTITY_REUSED=NO'
+
+      - name: Download exact canonical-main build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bridgex-release-${{ inputs.source_sha }}
+          path: verified-release
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run_id }}
+
+      - name: Validate hashes and exact VirusTotal evidence
+        shell: bash
+        env:
+          INSTALLER_SHA256_INPUT: ${{ inputs.installer_sha256 }}
+          PORTABLE_SHA256_INPUT: ${{ inputs.portable_sha256 }}
+          INSTALLER_VT_URL: ${{ inputs.installer_virustotal_url }}
+          PORTABLE_VT_URL: ${{ inputs.portable_virustotal_url }}
+          INSTALLER_VT_MALICIOUS: ${{ inputs.installer_virustotal_malicious }}
+          INSTALLER_VT_SUSPICIOUS: ${{ inputs.installer_virustotal_suspicious }}
+          PORTABLE_VT_MALICIOUS: ${{ inputs.portable_virustotal_malicious }}
+          PORTABLE_VT_SUSPICIOUS: ${{ inputs.portable_virustotal_suspicious }}
+        run: |
+          set -euo pipefail
+
+          installer="verified-release/release-assets/${BUILD_NAME}-Setup.exe"
+          portable="verified-release/release-assets/${BUILD_NAME}.zip"
+          sums="verified-release/release-assets/SHA256SUMS.txt"
+
+          [[ -s "$installer" ]] || { echo 'PROMOTION_INSTALLER_MISSING=FAIL'; exit 42; }
+          [[ -s "$portable" ]] || { echo 'PROMOTION_PORTABLE_MISSING=FAIL'; exit 42; }
+          [[ -s "$sums" ]] || { echo 'PROMOTION_SHA256SUMS_MISSING=FAIL'; exit 42; }
+
+          installer_hash="$(sha256sum "$installer" | awk '{print $1}')"
+          portable_hash="$(sha256sum "$portable" | awk '{print $1}')"
+          installer_input="$(tr '[:upper:]' '[:lower:]' <<<"$INSTALLER_SHA256_INPUT")"
+          portable_input="$(tr '[:upper:]' '[:lower:]' <<<"$PORTABLE_SHA256_INPUT")"
+
+          [[ "$installer_input" =~ ^[0-9a-f]{64}$ ]] || { echo 'INSTALLER_SHA256_INPUT=FAIL'; exit 42; }
+          [[ "$portable_input" =~ ^[0-9a-f]{64}$ ]] || { echo 'PORTABLE_SHA256_INPUT=FAIL'; exit 42; }
+          [[ "$installer_hash" == "$installer_input" ]] || { echo "INSTALLER_SHA256_MISMATCH actual=$installer_hash"; exit 42; }
+          [[ "$portable_hash" == "$portable_input" ]] || { echo "PORTABLE_SHA256_MISMATCH actual=$portable_hash"; exit 42; }
+
+          (
+            cd verified-release/release-assets
+            sha256sum --check --strict SHA256SUMS.txt
+          )
+
+          [[ "$INSTALLER_VT_MALICIOUS" == '0' ]] || { echo "INSTALLER_VIRUSTOTAL_MALICIOUS=FAIL count=$INSTALLER_VT_MALICIOUS"; exit 42; }
+          [[ "$INSTALLER_VT_SUSPICIOUS" == '0' ]] || { echo "INSTALLER_VIRUSTOTAL_SUSPICIOUS=FAIL count=$INSTALLER_VT_SUSPICIOUS"; exit 42; }
+          [[ "$PORTABLE_VT_MALICIOUS" == '0' ]] || { echo "PORTABLE_VIRUSTOTAL_MALICIOUS=FAIL count=$PORTABLE_VT_MALICIOUS"; exit 42; }
+          [[ "$PORTABLE_VT_SUSPICIOUS" == '0' ]] || { echo "PORTABLE_VIRUSTOTAL_SUSPICIOUS=FAIL count=$PORTABLE_VT_SUSPICIOUS"; exit 42; }
+
+          [[ "$INSTALLER_VT_URL" == "https://www.virustotal.com/gui/file/$installer_hash"* ]] || {
+            echo 'INSTALLER_VIRUSTOTAL_EXACT_HASH_URL=FAIL'
+            exit 42
+          }
+          [[ "$PORTABLE_VT_URL" == "https://www.virustotal.com/gui/file/$portable_hash"* ]] || {
+            echo 'PORTABLE_VIRUSTOTAL_EXACT_HASH_URL=FAIL'
+            exit 42
+          }
+
+          echo "INSTALLER_SHA256=$installer_hash" >> "$GITHUB_ENV"
+          echo "PORTABLE_SHA256=$portable_hash" >> "$GITHUB_ENV"
+          echo "INSTALLER_VIRUSTOTAL_URL=$INSTALLER_VT_URL" >> "$GITHUB_ENV"
+          echo "PORTABLE_VIRUSTOTAL_URL=$PORTABLE_VT_URL" >> "$GITHUB_ENV"
+          echo 'RELEASE_ASSET_SHA256=PASS'
+          echo 'INSTALLER_VIRUSTOTAL_EXACT_ARTIFACT=PASS'
+          echo 'PORTABLE_VIRUSTOTAL_EXACT_ARTIFACT=PASS'
+          echo 'VIRUSTOTAL_MALICIOUS_COUNT=0'
+          echo 'VIRUSTOTAL_SUSPICIOUS_COUNT=0'
+
+      - name: Write verified release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > verified-release/release-notes-verified.md <<EOF
+          # TNSuite BridgeX v0.5 Build12-Hotfix17
+
+          **File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**
+
+          Build12-Hotfix17 thay thế bản Hotfix16 đã bị thu hồi. Bản này dùng installer đã được harden lại và chỉ được phát hành sau khi đối chiếu SHA-256 cùng báo cáo VirusTotal của đúng artifact từ protected main.
+
+          ## Tải xuống
+
+          **Installer**
+
+          ${BUILD_NAME}-Setup.exe  
+          SHA-256: ${INSTALLER_SHA256}  
+          VirusTotal: ${INSTALLER_VIRUSTOTAL_URL}
+
+          **Portable**
+
+          ${BUILD_NAME}.zip  
+          SHA-256: ${PORTABLE_SHA256}  
+          VirusTotal: ${PORTABLE_VIRUSTOTAL_URL}
+
+          **Checksum**
+
+          SHA256SUMS.txt
+
+          ## Có gì trong bản này
+
+          - Dark Mode / Light Mode;
+          - ghi nhớ giao diện đã chọn;
+          - English / Tiếng Việt;
+          - SFTP / truyền tệp;
+          - Windows installer và portable build;
+          - CLI automation/SFTP có phạm vi giới hạn;
+          - installer không còn nhúng/chạy PowerShell helper hoặc tự động terminate BridgeX;
+          - installer dùng NSIS zlib thay cho solid LZMA.
+
+          ## Xác minh phát hành
+
+          Source SHA: ${BRIDGEX_SOURCE_SHA}  
+          Canonical main build run: ${{ inputs.build_run_id }}  
+          RCP profile: ${RCP_RELEASE_PROFILE}
+
+          > BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.
+          EOF
+          echo 'VERIFIED_RELEASE_NOTES=PASS'
+
+      - name: Governed promotion acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BRIDGEX_RELEASE_TAG" == 'v0.5-Build12-Hotfix17' ]]
+          [[ "$BRIDGEX_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$INSTALLER_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$PORTABLE_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$INSTALLER_VIRUSTOTAL_URL" == "https://www.virustotal.com/gui/file/$INSTALLER_SHA256"* ]]
+          [[ "$PORTABLE_VIRUSTOTAL_URL" == "https://www.virustotal.com/gui/file/$PORTABLE_SHA256"* ]]
+          echo 'PUBLIC_DESKTOP_RELEASE_PROFILE=PASS'
+          echo 'CANONICAL_MAIN_SOURCE=PASS'
+          echo 'CANONICAL_MAIN_ARTIFACT_REUSE=PASS'
+          echo 'RELEASE_ASSET_SHA256=PASS'
+          echo 'VIRUSTOTAL_EXACT_ARTIFACT_GATE=PASS'
+          echo 'GUI_RUNTIME=NOT_VERIFIED_BY_RELEASE_WORKFLOW'
+          echo 'PRODUCTION_HOST_ACCESS=NONE'
+          echo 'DATABASE_EXECUTION=NOT_PERFORMED'
+          echo 'BRIDGEX_PROMOTION_ACCEPTANCE=PASS'
+
+      - name: Publish exact verified assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets='verified-release/release-assets'
+          gh release create "$BRIDGEX_RELEASE_TAG" \
+            "$assets/${BUILD_NAME}-Setup.exe#Windows x64 installer" \
+            "$assets/${BUILD_NAME}.zip#Windows x64 portable" \
+            "$assets/SHA256SUMS.txt#SHA-256 checksums" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$BRIDGEX_SOURCE_SHA" \
+            --title "$BRIDGEX_RELEASE_TITLE" \
+            --notes-file verified-release/release-notes-verified.md
+          echo 'PROMOTION_RELEASE_CREATED=yes' >> "$GITHUB_ENV"
+          echo 'GITHUB_RELEASE_PUBLISHED=PASS'
+
+      - name: Verify published artifact bytes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf published-verify
+          mkdir -p published-verify
+          gh release download "$BRIDGEX_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir published-verify \
+            --pattern "${BUILD_NAME}-Setup.exe" \
+            --pattern "${BUILD_NAME}.zip" \
+            --pattern 'SHA256SUMS.txt'
+
+          published_installer="$(sha256sum "published-verify/${BUILD_NAME}-Setup.exe" | awk '{print $1}')"
+          published_portable="$(sha256sum "published-verify/${BUILD_NAME}.zip" | awk '{print $1}')"
+          [[ "$published_installer" == "$INSTALLER_SHA256" ]] || { echo 'PUBLISHED_INSTALLER_SHA256=FAIL'; exit 42; }
+          [[ "$published_portable" == "$PORTABLE_SHA256" ]] || { echo 'PUBLISHED_PORTABLE_SHA256=FAIL'; exit 42; }
+          (
+            cd published-verify
+            sha256sum --check --strict SHA256SUMS.txt
+          )
+          echo 'PUBLISHED_ASSET_IMMUTABILITY_QA=PASS'
+          echo 'GITHUB_RELEASE_POST_PUBLISH_VERIFY=PASS'
+
+      - name: Withdraw promotion if post-publish verification fails
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "${PROMOTION_RELEASE_CREATED:-no}" == 'yes' ]]; then
+            gh release delete 'v0.5-Build12-Hotfix17' --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            echo 'FAILED_PROMOTION_RELEASE_WITHDRAWN=PASS'
+          else
+            echo 'FAILED_PROMOTION_RELEASE_NOT_CREATED=PASS'
+          fi
