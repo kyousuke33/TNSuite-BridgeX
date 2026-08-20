@@ -13,7 +13,8 @@ $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $BuildName = 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX'
-$ProductVersion = '0.5.12.18'
+$MsiVersion = '0.5.1218'
+$BundleVersion = '0.5.12.18'
 $ProductUpgradeCode = '{B8BF51DD-E1B4-4A6E-B543-1661EF5EA8EA}'
 $BundleUpgradeCode = '{7E03045D-320D-4AB5-8DD0-02BFF00F058B}'
 $ExpectedBridgeXHash = '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
@@ -62,11 +63,13 @@ foreach ($relative in $RequiredDlls) {
 $files = @(Get-ChildItem -LiteralPath $PayloadRoot -File -Recurse | Sort-Object FullName)
 if ($files.Count -lt 10) { throw "PAYLOAD_FILE_COUNT_UNEXPECTED=$($files.Count)" }
 
-# Build a directory map. The MSI deliberately installs into the existing
-# Program Files\TNSuite\BridgeX tree without deleting unknown content first.
-# Windows Installer owns only files/components in this package. This allows
-# safe migration from prior NSIS/native candidates without a proprietary
-# marker gate and without recursive deletion of an unverified directory.
+# MSI migration model:
+# - install into the canonical Program Files\TNSuite\BridgeX path;
+# - overwrite files owned by this MSI;
+# - never recursively delete an existing unverified directory;
+# - do not require the project-specific marker used by earlier installer candidates.
+# This safely tolerates an existing legacy NSIS/native installation tree while
+# making Windows Installer authoritative for all files introduced by this MSI.
 $dirPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 foreach ($file in $files) {
     $relative = [System.IO.Path]::GetRelativePath($PayloadRoot, $file.FullName).Replace('/', '\')
@@ -100,7 +103,7 @@ function EmitDirectoryTree([System.Text.StringBuilder]$sb, [string]$parentPath, 
 $product = [System.Text.StringBuilder]::new()
 [void]$product.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
 [void]$product.AppendLine('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">')
-[void]$product.AppendLine('  <Package Name="TNSuite BridgeX" Manufacturer="TNSuite" Version="' + $ProductVersion + '" UpgradeCode="' + $ProductUpgradeCode + '" Scope="perMachine">')
+[void]$product.AppendLine('  <Package Name="TNSuite BridgeX" Manufacturer="TNSuite" Version="' + $MsiVersion + '" UpgradeCode="' + $ProductUpgradeCode + '" Scope="perMachine">')
 [void]$product.AppendLine('    <MajorUpgrade DowngradeErrorMessage="A newer version of TNSuite BridgeX is already installed." />')
 [void]$product.AppendLine('    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />')
 [void]$product.AppendLine('    <Feature Id="MainFeature" Title="TNSuite BridgeX" Level="1">')
@@ -139,7 +142,7 @@ foreach ($file in $files) {
 [void]$product.AppendLine('    <Component Id="StartMenuShortcutComponent" Directory="ApplicationProgramsFolder" Guid="{33CC5719-43A4-4D98-B676-8A7358E79F73}">')
 [void]$product.AppendLine('      <Shortcut Id="StartMenuShortcut" Name="TNSuite BridgeX" Description="TNSuite BridgeX" Target="[INSTALLFOLDER]bin\BridgeX.exe" WorkingDirectory="' + (StableId 'DIR' 'bin') + '" />')
 [void]$product.AppendLine('      <RemoveFolder Id="ApplicationProgramsFolderCleanup" On="uninstall" />')
-[void]$product.AppendLine('      <RegistryValue Root="HKLM" Key="Software\TNSuite\BridgeX" Name="InstallerGeneration" Type="string" Value="WiX-' + $ProductVersion + '" KeyPath="yes" />')
+[void]$product.AppendLine('      <RegistryValue Root="HKLM" Key="Software\TNSuite\BridgeX" Name="InstallerGeneration" Type="string" Value="WiX-' + $BundleVersion + '" KeyPath="yes" />')
 [void]$product.AppendLine('    </Component>')
 [void]$product.AppendLine('  </Fragment>')
 [void]$product.AppendLine('</Wix>')
@@ -155,7 +158,7 @@ Write-Host 'WIX_MSI_BUILD=PASS'
 $bundle = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
-  <Bundle Name="TNSuite BridgeX" Manufacturer="TNSuite" Version="$ProductVersion" UpgradeCode="$BundleUpgradeCode">
+  <Bundle Name="TNSuite BridgeX" Manufacturer="TNSuite" Version="$BundleVersion" UpgradeCode="$BundleUpgradeCode">
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="" SuppressOptionsUI="yes" />
     </BootstrapperApplication>
@@ -169,7 +172,7 @@ $BundleWxs = Join-Path $WixRoot 'BridgeX.Bundle.wxs'
 [System.IO.File]::WriteAllText($BundleWxs, $bundle, [System.Text.UTF8Encoding]::new($false))
 
 $ExePath = Join-Path $OutputDirectory "$BuildName-Setup.exe"
-& wix build -arch x64 -ext WixToolset.Bal.wixext -o $ExePath $BundleWxs
+& wix build -arch x64 -ext WixToolset.BootstrapperApplications.wixext -o $ExePath $BundleWxs
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $ExePath)) { throw "WIX_BUNDLE_BUILD_FAILED=$LASTEXITCODE" }
 Write-Host 'WIX_BUNDLE_BUILD=PASS'
 
@@ -180,6 +183,7 @@ Write-Host "WIX_SETUP_SHA256=$exeHash"
 Write-Host "WIX_PAYLOAD_FILES=$($files.Count)"
 Write-Host 'LEGACY_INSTALL_MARKER_GATE=REMOVED'
 Write-Host 'RECURSIVE_UNVERIFIED_INSTALL_DIR_DELETE=NONE'
+Write-Host 'LEGACY_INSTALL_TREE_MIGRATION=OVERWRITE_MANAGED_FILES_ONLY'
 Write-Host 'INSTALLER_ENGINE=WIX_BURN_MSI'
 Write-Host 'CUSTOM_SELF_EXTRACTOR=NONE'
 Write-Host 'INSTALLER_PACKER=NONE'
