@@ -75,13 +75,35 @@ jobs:
       source_sha: ${{ github.sha }}
       publish_release: false
 
-  windows-release:
-    name: Governed Windows release
+  withdraw-hotfix16-release:
+    name: Withdraw flagged Hotfix16 release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: governance
+    runs-on: ubuntu-latest
     permissions:
       contents: write
+    steps:
+      - name: Delete GitHub Release and tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='v0.5-Build12-Hotfix16'
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            echo 'HOTFIX16_RELEASE_WITHDRAWN=PASS'
+          else
+            echo 'HOTFIX16_RELEASE_ALREADY_ABSENT=PASS'
+          fi
+
+  windows-main-build-qa:
+    name: Windows main build QA (publication paused)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [governance, withdraw-hotfix16-release]
+    permissions:
+      contents: read
     uses: ./.github/workflows/windows-release.yml
     with:
       source_sha: ${{ github.sha }}
-      publish_release: true
+      publish_release: false
