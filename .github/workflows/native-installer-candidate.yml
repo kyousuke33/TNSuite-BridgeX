@@ -56,25 +56,33 @@ jobs:
           Write-Host "WIX_VERSION_PINNED=$env:WIX_VERSION"
           Write-Host 'WIX_TOOLCHAIN_QA=PASS'
 
-      - name: Build WiX MSI and single-file EXE bundle
+      - name: Build branded WiX installer with selectable location
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-QA.txt'
+          $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-QA.txt'
 
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer.ps1 `
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix19.ps1 `
             -PortableZip $portable `
             -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "WIX_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
 
-          $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi'
-          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe'
+          $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX.msi'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-Setup.exe'
           foreach ($artifact in @($msi, $setup)) {
             if (-not (Test-Path -LiteralPath $artifact)) { throw "WIX_ARTIFACT_MISSING=$artifact" }
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact).Hash.ToLowerInvariant()
             "ARTIFACT_SHA256 file=$([System.IO.Path]::GetFileName($artifact)) sha256=$hash" | Tee-Object -FilePath $qa -Append
           }
+
+          try { Add-Type -AssemblyName System.Drawing.Common -ErrorAction Stop } catch { Add-Type -AssemblyName System.Drawing }
+          $setupIcon = [System.Drawing.Icon]::ExtractAssociatedIcon($setup)
+          if ($null -eq $setupIcon -or $setupIcon.Width -lt 16 -or $setupIcon.Height -lt 16) { throw 'SETUP_EXE_ICON_RESOURCE=FAIL' }
+          Write-Host "SETUP_EXE_ICON_RESOURCE=PASS size=$($setupIcon.Width)x$($setupIcon.Height)"
+          $setupIcon.Dispose()
+          Write-Host 'INSTALL_LOCATION_UI=ENABLED'
+          Write-Host 'INSTALLER_BRANDING_QA=PASS'
           Write-Host 'WIX_INSTALLER_CANDIDATE_QA=PASS'
 
       - name: Microsoft Defender scan request
@@ -90,8 +98,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $defender)) { throw 'MICROSOFT_DEFENDER_CLI_MISSING' }
 
           $targets = @(
-            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi'),
-            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe')
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX.msi'),
+            (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-Setup.exe')
           )
           foreach ($target in $targets) {
             $scanOutput = @(& $defender -Scan -ScanType 3 -File $target 2>&1)
@@ -104,11 +112,11 @@ jobs:
             }
           }
 
-      - name: Markerless legacy-folder install and runtime QA
+      - name: Default markerless migration and runtime QA
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-Setup.exe'
           $installRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
           $legacySentinel = Join-Path $installRoot 'legacy-file-not-owned-by-wix.txt'
           $oldMarker = Join-Path $installRoot '.tnsuite-bridgex-install'
@@ -123,13 +131,12 @@ jobs:
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
           if ($install.ExitCode -notin @(0, 3010)) { throw "WIX_BUNDLE_INSTALL=FAIL exit=$($install.ExitCode)" }
-          Write-Host "WIX_BUNDLE_INSTALL=PASS exit=$($install.ExitCode)"
-
           if (-not (Test-Path -LiteralPath $installedExe)) { throw 'INSTALLED_BRIDGEX_EXE_MISSING' }
           $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
           if ($actualHash -ne $expectedHash) { throw "INSTALLED_BRIDGEX_HASH=FAIL expected=$expectedHash actual=$actualHash" }
-          Write-Host "INSTALLED_BRIDGEX_HASH=PASS sha256=$actualHash"
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_INSTALL' }
+          Write-Host "DEFAULT_LOCATION_INSTALL=PASS path=$installRoot"
+          Write-Host "INSTALLED_BRIDGEX_HASH=PASS sha256=$actualHash"
           Write-Host 'LEGACY_UNOWNED_FILE_PRESERVED_ON_INSTALL=PASS'
 
           $bin = Split-Path -Parent $installedExe
@@ -142,21 +149,56 @@ jobs:
 
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
           if ($uninstall.ExitCode -notin @(0, 3010)) { throw "WIX_BUNDLE_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
-          Write-Host "WIX_BUNDLE_UNINSTALL=PASS exit=$($uninstall.ExitCode)"
           if (Test-Path -LiteralPath $installedExe) { throw 'WIX_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_UNINSTALL' }
           Write-Host 'LEGACY_UNOWNED_FILE_PRESERVED_ON_UNINSTALL=PASS'
-
           Remove-Item -LiteralPath $installRoot -Recurse -Force
           Write-Host 'MARKERLESS_LEGACY_MIGRATION_QA=PASS'
+
+      - name: Custom install location and runtime QA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-Setup.exe'
+          $defaultRoot = Join-Path $env:ProgramFiles 'TNSuite\BridgeX'
+          $customRoot = Join-Path $env:RUNNER_TEMP 'BridgeX-Custom-Install'
+          $installedExe = Join-Path $customRoot 'bin\BridgeX.exe'
+          $expectedHash = '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
+
+          if (Test-Path -LiteralPath $customRoot) { Remove-Item -LiteralPath $customRoot -Recurse -Force }
+          if (Test-Path -LiteralPath $defaultRoot) { Remove-Item -LiteralPath $defaultRoot -Recurse -Force }
+
+          $installArgs = @('/quiet','/norestart',("InstallFolder={0}" -f $customRoot))
+          $install = Start-Process -FilePath $setup -ArgumentList $installArgs -Wait -PassThru
+          if ($install.ExitCode -notin @(0, 3010)) { throw "CUSTOM_LOCATION_INSTALL=FAIL exit=$($install.ExitCode)" }
+          if (-not (Test-Path -LiteralPath $installedExe)) { throw "CUSTOM_LOCATION_BRIDGEX_MISSING path=$installedExe" }
+          if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'CUSTOM_LOCATION_IGNORED_DEFAULT_PATH_POPULATED' }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw "CUSTOM_LOCATION_HASH=FAIL expected=$expectedHash actual=$actualHash" }
+          Write-Host "CUSTOM_LOCATION_INSTALL=PASS path=$customRoot"
+          Write-Host "CUSTOM_LOCATION_BRIDGEX_HASH=PASS sha256=$actualHash"
+
+          $bin = Split-Path -Parent $installedExe
+          $runtime = Start-Process -FilePath $installedExe -WorkingDirectory $bin -PassThru
+          Start-Sleep -Seconds 5
+          if ($runtime.HasExited) { throw "CUSTOM_LOCATION_RUNTIME=FAIL exit=$($runtime.ExitCode)" }
+          Write-Host 'CUSTOM_LOCATION_RUNTIME=PASS process_alive_after_5s'
+          Stop-Process -Id $runtime.Id -Force
+          $runtime.WaitForExit()
+
+          $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
+          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "CUSTOM_LOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if (Test-Path -LiteralPath $installedExe) { throw 'CUSTOM_LOCATION_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
+          if (Test-Path -LiteralPath $customRoot) { Remove-Item -LiteralPath $customRoot -Recurse -Force }
+          Write-Host 'CUSTOM_INSTALL_LOCATION_QA=PASS'
 
       - name: Upload WiX installer candidate
         uses: actions/upload-artifact@v4
         with:
-          name: bridgex-wix-installer-${{ github.event.pull_request.head.sha }}
+          name: bridgex-wix-hotfix19-${{ github.event.pull_request.head.sha }}
           path: |
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX.msi
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-Setup.exe
-            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX-QA.txt
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX.msi
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-Setup.exe
+            dist/TNSuiteBridgeX_260820_v0.5-Build12-Hotfix19-WiX-QA.txt
           if-no-files-found: error
           retention-days: 7
