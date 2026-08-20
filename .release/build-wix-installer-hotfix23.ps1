@@ -19,8 +19,9 @@ foreach ($asset in @('BridgeX.Hotfix23.Theme.xml','BridgeX.Hotfix23.Theme.wxl'))
 # - state-aware product detection for Install vs Update;
 # - standard same-version WixStdBA Modify page (Repair/Uninstall);
 # - Burn-level CloseApplication before MSI execution;
-# - MSI-level CloseApplication as a fallback;
-# - persisted install-base registry values for subsequent upgrades.
+# - MSI-level CloseApplication as a fallback.
+# Install-path migration between related bundles is deliberately validated by
+# runtime QA before adding any extra persistence mechanism.
 $source = Get-Content -LiteralPath $hotfix21 -Raw -Encoding UTF8
 $source = $source.Replace('TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX', 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix23-WiX')
 $source = $source.Replace("0.5.1221", "0.5.1223")
@@ -36,8 +37,8 @@ if (-not $source.Contains($anchor)) { throw 'HOTFIX23_INJECTION_ANCHOR_MISSING' 
 
 $injection = @'
 # Product MSI fallback close. Burn-level close below is intentionally earlier so
-# Windows Installer should never need to show Restart Manager / Files In Use for
-# BridgeX-owned processes during update/repair/uninstall.
+# Windows Installer should not need Restart Manager / Files In Use for BridgeX-
+# owned processes during update/repair/uninstall.
 $wixRootNeedle = "[void]`$product.AppendLine('<Wix xmlns=`"http://wixtoolset.org/schemas/v4/wxs`">')"
 $wixRootReplacement = "[void]`$product.AppendLine('<Wix xmlns=`"http://wixtoolset.org/schemas/v4/wxs`" xmlns:util=`"http://wixtoolset.org/schemas/v4/wxs/util`">')"
 if (-not $text.Contains($wixRootNeedle)) { throw 'HOTFIX23_MSI_UTIL_NAMESPACE_PATCH_POINT_MISSING' }
@@ -51,22 +52,13 @@ $upgradeReplacement = $upgradeNeedle + "`r`n" +
 if (-not $text.Contains($upgradeNeedle)) { throw 'HOTFIX23_MSI_CLOSE_PATCH_POINT_MISSING' }
 $text = $text.Replace($upgradeNeedle, $upgradeReplacement)
 
-# Persist the base/final installation paths for future upgrade generations.
-$registryNeedle = "[void]`$product.AppendLine('      <RegistryValue Root=`"HKLM`" Key=`"Software\\TNSuite\\BridgeX`" Name=`"InstallerGeneration`" Type=`"string`" Value=`"WiX-' + `$BundleVersion + '`" KeyPath=`"yes`" />')"
-$registryReplacement = $registryNeedle + "`r`n" +
-    "[void]`$product.AppendLine('      <RegistryValue Root=`"HKLM`" Key=`"Software\\TNSuite\\BridgeX`" Name=`"InstallBase`" Type=`"string`" Value=`"[INSTALLBASE]`" />')" + "`r`n" +
-    "[void]`$product.AppendLine('      <RegistryValue Root=`"HKLM`" Key=`"Software\\TNSuite\\BridgeX`" Name=`"InstallLocation`" Type=`"string`" Value=`"[INSTALLFOLDER]`" />')" + "`r`n" +
-    "[void]`$product.AppendLine('      <RegistryValue Root=`"HKLM`" Key=`"Software\\TNSuite\\BridgeX`" Name=`"InstalledMsiVersion`" Type=`"string`" Value=`"0.5.1223`" />')"
-if (-not $text.Contains($registryNeedle)) { throw 'HOTFIX23_INSTALL_LOCATION_REGISTRY_PATCH_POINT_MISSING' }
-$text = $text.Replace($registryNeedle, $registryReplacement)
-
 $msiBuildNeedle = '& wix build -arch x64 -o $MsiPath $ProductWxs'
 $msiBuildReplacement = '& wix build -arch x64 -ext WixToolset.Util.wixext -o $MsiPath $ProductWxs'
 if (-not $text.Contains($msiBuildNeedle)) { throw 'HOTFIX23_MSI_UTIL_BUILD_PATCH_POINT_MISSING' }
 $text = $text.Replace($msiBuildNeedle, $msiBuildReplacement)
 
 # Bundle-level detection/close runs before MSI file replacement. ProductSearch
-# finds the highest installed MSI sharing the BridgeX product UpgradeCode.
+# finds the highest installed MSI sharing the stable BridgeX Product UpgradeCode.
 $bundleRootNeedle = '<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">'
 $bundleRootReplacement = '<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">'
 if (-not $text.Contains($bundleRootNeedle)) { throw 'HOTFIX23_BUNDLE_UTIL_NAMESPACE_PATCH_POINT_MISSING' }
@@ -76,7 +68,6 @@ $launchVarNeedle = '    <Variable Name="LaunchAfterInstall" Type="numeric" Value
 $stateBlock = $launchVarNeedle + "`r`n" +
     '    <Variable Name="TargetBridgeXMsiVersion" Type="version" Value="0.5.1223" />' + "`r`n" +
     '    <util:ProductSearch Id="DetectBridgeXProductVersion" UpgradeCode="{B8BF51DD-E1B4-4A6E-B543-1661EF5EA8EA}" Variable="DetectedBridgeXMsiVersion" Result="version" />' + "`r`n" +
-    '    <util:RegistrySearch Id="DetectBridgeXInstallBase" Root="HKLM" Key="Software\TNSuite\BridgeX" Value="InstallBase" Variable="InstallFolder" Result="value" Bitness="always64" />' + "`r`n" +
     '    <util:CloseApplication Id="BundleCloseBridgeXCli" Target="BridgeX-CLI.exe" Condition="WixBundleInstalled OR DetectedBridgeXMsiVersion > v0.0.0.0" CloseMessage="yes" Timeout="3" TerminateProcess="0" RebootPrompt="no" PromptToContinue="no" Sequence="1" />' + "`r`n" +
     '    <util:CloseApplication Id="BundleCloseBridgeXGui" Target="BridgeX.exe" Condition="WixBundleInstalled OR DetectedBridgeXMsiVersion > v0.0.0.0" CloseMessage="yes" Timeout="3" TerminateProcess="0" RebootPrompt="no" PromptToContinue="no" Sequence="2" />'
 if (-not $text.Contains($launchVarNeedle)) { throw 'HOTFIX23_BUNDLE_STATE_PATCH_POINT_MISSING' }
@@ -88,7 +79,7 @@ if (-not $text.Contains($bundleBuildNeedle)) { throw 'HOTFIX23_BUNDLE_UTIL_BUILD
 $text = $text.Replace($bundleBuildNeedle, $bundleBuildReplacement)
 
 $text = $text.Replace("Write-Host 'INSTALLER_PROCESS_KILL=NONE'", "Write-Host 'INSTALLER_PROCESS_CLOSE=BURN_PRE_MSI_PLUS_MSI_FALLBACK_BRIDGEX_ONLY'")
-$text = $text.Replace("Write-Host 'WIX_INSTALLER_BUILD=PASS'", "Write-Host 'MAINTENANCE_STATE_DETECTION=PRODUCT_SEARCH'`r`nWrite-Host 'NEWER_SETUP_ACTION=UPDATE'`r`nWrite-Host 'SAME_VERSION_ACTIONS=REPAIR_UNINSTALL'`r`nWrite-Host 'PRE_MSI_AUTO_CLOSE_BRIDGEX=ENABLED'`r`nWrite-Host 'AUTO_CLOSE_FORCE_TERMINATE_FALLBACK=BRIDGEX_ONLY'`r`nWrite-Host 'AUTO_CLOSE_REBOOT_PROMPT=DISABLED'`r`nWrite-Host 'INSTALL_BASE_PERSISTENCE=HKLM_SOFTWARE_TNSUITE_BRIDGEX'`r`nWrite-Host 'WIX_INSTALLER_BUILD=PASS'")
+$text = $text.Replace("Write-Host 'WIX_INSTALLER_BUILD=PASS'", "Write-Host 'MAINTENANCE_STATE_DETECTION=PRODUCT_SEARCH'`r`nWrite-Host 'NEWER_SETUP_ACTION=UPDATE'`r`nWrite-Host 'SAME_VERSION_ACTIONS=REPAIR_UNINSTALL'`r`nWrite-Host 'PRE_MSI_AUTO_CLOSE_BRIDGEX=ENABLED'`r`nWrite-Host 'AUTO_CLOSE_FORCE_TERMINATE_FALLBACK=BRIDGEX_ONLY'`r`nWrite-Host 'AUTO_CLOSE_REBOOT_PROMPT=DISABLED'`r`nWrite-Host 'INSTALL_BASE_MIGRATION=RUNTIME_QA_REQUIRED'`r`nWrite-Host 'WIX_INSTALLER_BUILD=PASS'")
 '@
 
 $source = $source.Replace($anchor, $injection + "`r`n`r`n" + $anchor)
