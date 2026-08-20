@@ -12,6 +12,27 @@ if [[ ! -f "$MANIFEST" ]]; then
 fi
 
 if ! sha256sum --check --strict "$MANIFEST"; then
+  echo 'SOURCE_BASELINE_MANIFEST=FAIL reason=CONTENT_MISMATCH' >&2
+  python3 - "$MANIFEST" <<'PY'
+from pathlib import Path
+import hashlib
+import sys
+
+manifest = Path(sys.argv[1])
+for raw in manifest.read_text(encoding='utf-8').splitlines():
+    raw = raw.strip()
+    if not raw:
+        continue
+    expected, path_text = raw.split(None, 1)
+    path_text = path_text.lstrip('* ')
+    path = Path(path_text)
+    if not path.is_file():
+        print(f'SOURCE_MANIFEST_DIFF path={path_text} expected={expected} actual=MISSING')
+        continue
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual != expected.lower():
+        print(f'SOURCE_MANIFEST_DIFF path={path_text} expected={expected.lower()} actual={actual}')
+PY
   echo 'SOURCE_BASELINE_IMPORT_PENDING: Build12-Hotfix16 canonical source is incomplete or does not match the pinned manifest.' >&2
   exit 42
 fi
