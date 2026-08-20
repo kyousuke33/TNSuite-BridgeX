@@ -2,8 +2,6 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text(encoding='utf-8')
-root=p.parent
-helper=(root/'BridgeX-CloseInstalled.ps1').read_text(encoding='utf-8') if (root/'BridgeX-CloseInstalled.ps1').exists() else ''
 checks = {
     'admin install': 'RequestExecutionLevel admin' in s,
     'program files install': '$PROGRAMFILES64\\TNSuite\\BridgeX' in s,
@@ -24,14 +22,15 @@ checks = {
     'uninstall marker fail closed': 'IfFileExists "$INSTDIR\\${BRIDGEX_INSTALL_MARKER}" uninstall_marker_ok' in s and 'Program files were not removed' in s,
     'full verified tree removal': 'SetOutPath "$TEMP"' in s and 'RMDir /r /REBOOTOK "$INSTDIR"' in s,
     'tnsuite parent only-if-empty removal': 'RMDir "$PROGRAMFILES64\\TNSuite"' in s,
-    'path-specific close helper': 'BridgeX-CloseInstalled.ps1' in s and '"$INSTDIR\\bin\\BridgeX.exe"' in s,
-    'close helper is temp-only': '"$INSTDIR\\BridgeX-CloseInstalled.ps1"' not in s and '"$TEMP\\BridgeX-CloseInstalled.ps1"' in s,
-    'helper verifies process path': '.Path' in helper and '-ieq $target' in helper,
-    'helper graceful then bounded kill': 'CloseMainWindow()' in helper and 'WaitForExit(3000)' in helper and '$process.Kill()' in helper,
-    'no broad process-name kill': 'Stop-Process -Name' not in helper and 'taskkill' not in helper.lower(),
+    'standard zlib compressor': 'SetCompressor zlib' in s,
+    'solid lzma disabled': 'SetCompressor /SOLID lzma' not in s,
+    'no powershell execution': 'powershell.exe' not in s.lower(),
+    'no execution-policy bypass': 'executionpolicy bypass' not in s.lower(),
+    'no embedded process helper': 'BridgeX-CloseInstalled.ps1' not in s,
+    'no process-kill primitives': 'taskkill' not in s.lower() and 'Stop-Process' not in s and '.Kill()' not in s,
     'clean upgrade requires verified install marker': r'IfFileExists "$INSTDIR\${BRIDGEX_INSTALL_MARKER}" install_clean_verified' in s and 'without the TNSuite install marker' in s,
     'clean upgrade removes old install tree before payload copy': 'install_clean_verified:' in s and 'RMDir /r "$INSTDIR"' in s and s.find('RMDir /r "$INSTDIR"') < s.find(r'File /r "${PAYLOAD_DIR}\*"'),
-    'mixed-version install is fail closed': 'No mixed-version install was created.' in s and 'Abort' in s,
+    'locked upgrade fails closed': 'Close BridgeX and any process using its files' in s and 'No mixed-version install was created.' in s and 'Abort' in s,
 }
 for k, v in checks.items():
     print(('PASS' if v else 'FAIL'), k)
