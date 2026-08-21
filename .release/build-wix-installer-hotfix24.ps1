@@ -36,8 +36,10 @@ $script = $script.Replace('INSTALLER_THEME=HOTFIX24_STATE_AWARE_MAINTENANCE', 'I
 $loadNeedle = '$source = Get-Content -LiteralPath $hotfix21 -Raw -Encoding UTF8'
 if (-not $script.Contains($loadNeedle)) { throw 'HOTFIX24_SOURCE_LOAD_ANCHOR_MISSING' }
 $override = @'
-$canonicalIcon = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'assets\branding\BridgeX-AppIcon.ico'
-$classicSidebar = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'installer\BridgeX-Setup-Sidebar.bmp'
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($repoRoot) -or -not (Test-Path -LiteralPath $repoRoot -PathType Container)) { throw "HOTFIX24_REPO_ROOT_RESOLUTION_FAILED=$repoRoot" }
+$canonicalIcon = Join-Path $repoRoot 'assets\branding\BridgeX-AppIcon.ico'
+$classicSidebar = Join-Path $repoRoot 'installer\BridgeX-Setup-Sidebar.bmp'
 $expectedIconSha256 = '06266307acb6a92aca9742dac59dd053029075256a30eec50a37a71e08296328'
 if (-not (Test-Path -LiteralPath $canonicalIcon)) { throw "HOTFIX24_CANONICAL_ICON_MISSING=$canonicalIcon" }
 if (-not (Test-Path -LiteralPath $classicSidebar)) { throw "HOTFIX24_CLASSIC_SIDEBAR_MISSING=$classicSidebar" }
