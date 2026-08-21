@@ -179,6 +179,7 @@ jobs:
           if ($remove.ExitCode -ne 0) { throw "HF24_UNINSTALL_FAIL=$($remove.ExitCode)" }
 
       - name: Upload Hotfix24 candidate
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: bridgex-hotfix24-${{ github.event.pull_request.head.sha }}
