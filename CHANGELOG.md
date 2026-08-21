@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — governed roadmap execution and Build12 closure
+- Make the accepted `PROJECT_BIG_PICTURE.md` → `ROADMAP.md` → `CURRENT_STATE.md` → `DECISIONS.md` chain the explicit durable execution authority for BridgeX AI/contributors.
+- Require every implementation to identify the active release, phase, milestone, current blocker and next acceptance gate before mutating source.
+- Record the current Build12 release-closure sequence: Hotfix24 product identity/Windows integration → Build12 Release Candidate lock → exact-hash AV/release-trust validation → code-signing foundation → production distribution → Build12 closure; Build13 remains blocked until those required Build12 gates close.
+- Record active PR #28 evidence as coordination state only, not canonical-main acceptance: Hotfix24 full Windows source build passes, while the WiX build remains blocked by the generated PowerShell wrapper parser error observed in workflow run `32448690449`, job `96672917931`.
+- Lock release-engineering decisions around WiX 6/Burn+MSI, bounded BridgeX process closure, preservation of user profile/settings, direct canonical multi-resolution icon use, exact-hash AV evidence and build-once/promote-same-bytes semantics.
+- Preserve the RCP-managed public-repository trust boundary and existing canonical Big Picture; this governance change does not modify BridgeX runtime, transfer protocols, credentials, installer bytes or production systems.
+
 ## Unreleased — Build12-Hotfix17 security release remediation
 - Revoke acceptance of the published Build12-Hotfix16 Windows release after VirusTotal reported heuristic detections on the installer artifact.
 - Withdraw the flagged Hotfix16 GitHub Release and its release tag without mutating or replacing the published artifact bytes.
