@@ -30,6 +30,24 @@ jobs:
           $buildPath = '.\scripts\build-filezilla-dark.sh'
           $build = Get-Content -LiteralPath $buildPath -Raw -Encoding UTF8
 
+          # The old BuildKit checked three large design/reference exports that were
+          # deliberately removed from canonical source. Match the governed release
+          # adapter: validate the current shipped branding contract instead.
+          $brandingOld = @'
+          log "Branding/UI asset QA - fail closed"
+          python "$QA/branding_asset_check.py" "$KIT" | tee "$WORK/branding-asset-report.txt"
+          grep -q '^BRANDING_ASSET_QA=PASS$' "$WORK/branding-asset-report.txt"
+          '@
+          $brandingNew = @'
+          log "Canonical branding contract QA - fail closed"
+          python "$KIT/scripts/qa/branding_contract_check.py" "$KIT" | tee "$WORK/branding-contract-report.txt"
+          grep -q '^BRANDING_CONTRACT_QA=PASS$' "$WORK/branding-contract-report.txt"
+          '@
+          $brandingOld = $brandingOld -replace "`r`n", "`n"
+          $brandingNew = $brandingNew -replace "`r`n", "`n"
+          if (-not $build.Contains($brandingOld.Trim())) { throw 'HF24_BRANDING_CONTRACT_ADAPTER_ANCHOR_MISSING' }
+          $build = $build.Replace($brandingOld.Trim(), $brandingNew.Trim())
+
           $patchNeedle = 'python "$KIT/scripts/patch_tnsuite_bridgex.py" "$SRC"'
           $patchReplacement = $patchNeedle + "`n" + 'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"'
           if (-not $build.Contains($patchNeedle)) { throw 'HF24_RUNTIME_PATCH_HOOK_ANCHOR_MISSING' }
