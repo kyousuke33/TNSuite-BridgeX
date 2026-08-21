@@ -44,15 +44,18 @@ if (-not (Test-Path -LiteralPath $classicSidebar)) { throw "HOTFIX24_CLASSIC_SID
 $actualIconSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalIcon).Hash.ToLowerInvariant()
 if ($actualIconSha256 -ne $expectedIconSha256) { throw "HOTFIX24_CANONICAL_ICON_HASH_FAIL=$actualIconSha256" }
 
+# Emit valid PowerShell single-quoted path literals into the nested Hotfix21
+# builder. PowerShell does not use backslash to escape quotes; the previous
+# \"...\" authoring caused the generated builder to fail before WiX ran.
+$iconLiteral = "'" + $canonicalIcon.Replace("'", "''") + "'"
 $iconXmlNeedle = '$IconXml = XmlEscape $IconPath'
-$iconXmlReplacement = '$IconPath = "__HF24_ICON__"' + "`r`n" + '$IconXml = XmlEscape $IconPath'
-$iconXmlReplacement = $iconXmlReplacement.Replace('__HF24_ICON__', $canonicalIcon.Replace("'", "''"))
+$iconXmlReplacement = '$IconPath = ' + $iconLiteral + "`r`n" + '$IconXml = XmlEscape $IconPath'
 if (-not $source.Contains($iconXmlNeedle)) { throw 'HOTFIX24_ICON_OVERRIDE_ANCHOR_MISSING' }
 $source = $source.Replace($iconXmlNeedle, $iconXmlReplacement)
 
+$sidebarLiteral = "'" + $classicSidebar.Replace("'", "''") + "'"
 $logoXmlNeedle = '$LogoXml = XmlEscape $LogoPath'
-$logoXmlReplacement = '$LogoPath = "__HF24_SIDEBAR__"' + "`r`n" + '$LogoXml = XmlEscape $LogoPath'
-$logoXmlReplacement = $logoXmlReplacement.Replace('__HF24_SIDEBAR__', $classicSidebar.Replace("'", "''"))
+$logoXmlReplacement = '$LogoPath = ' + $sidebarLiteral + "`r`n" + '$LogoXml = XmlEscape $LogoPath'
 if (-not $source.Contains($logoXmlNeedle)) { throw 'HOTFIX24_LOGO_OVERRIDE_ANCHOR_MISSING' }
 $source = $source.Replace($logoXmlNeedle, $logoXmlReplacement)
 
