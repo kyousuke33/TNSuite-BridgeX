@@ -1,4 +1,81 @@
 # Current State
+
+## Live execution cursor
+
+This block is the short-lived coordination cursor for the first unmet roadmap gate. It may reference evidence from an active PR, but **active-PR evidence is not canonical-main acceptance until the relevant source is safely merged**.
+
+```text
+ROADMAP_ENABLED=true
+ROADMAP_AUTHORITY=docs/00_PRODUCT/ROADMAP.md
+BIG_PICTURE_AUTHORITY=docs/00_PRODUCT/PROJECT_BIG_PICTURE.md
+DECISION_AUTHORITY=docs/90_GOVERNANCE/DECISIONS.md
+ACTUAL_STATE_WINS=REQUIRED
+CHAT_MEMORY_AUTHORITY=NONE
+
+ACTIVE_RELEASE=Build12
+ACTIVE_PHASE=P0
+ACTIVE_PHASE_NAME=SECURE_DESKTOP_BASELINE_AND_BUILD12_RELEASE_CLOSURE
+ACTIVE_WORKSTREAM=P0.D_PRODUCT_IDENTITY_AND_WINDOWS_INTEGRATION
+ACTIVE_MILESTONE=Build12-Hotfix24
+ACTIVE_MILESTONE_STATUS=IN_PROGRESS
+LAST_MAIN_ACCEPTED_MILESTONE=P0.B_BUILD12_PRODUCT_BASELINE
+P0.C_INSTALLER_LIFECYCLE=EVIDENCED_IN_ACTIVE_PR_NOT_MERGED
+
+ACTIVE_IMPLEMENTATION_PR=28
+ACTIVE_IMPLEMENTATION_BRANCH=fix/native-installer-av-20260820
+ACTIVE_IMPLEMENTATION_HEAD=8791361655cb626d9671c48de609f09dbe5cd21a
+ACTIVE_IMPLEMENTATION_ACCEPTANCE=NOT_MERGED
+ACTIVE_IMPLEMENTATION_PR_BASE_SNAPSHOT=5c9d70673d9b5da4a4878c9ce548077f0ef67539
+CURRENT_MAIN_AT_EXECUTION_ROADMAP_UPDATE=8fda066788ebcca6f6cff173357eb368c29f2933
+PR28_MAIN_DIVERGENCE=RECONCILE_BEFORE_MERGE
+
+HOTFIX23_RUNTIME_ACCEPTANCE=PASS_IN_ACTIVE_PR_EVIDENCE_ONLY
+HOTFIX23_ACCEPTANCE_RUN=32397251495
+HOTFIX23_WIX_INSTALLER_BUILD=PASS
+HOTFIX23_INSTALL_UPDATE_REPAIR_UNINSTALL=PASS
+HOTFIX23_CUSTOM_LOCATION_PRESERVATION=PASS
+HOTFIX23_FILES_IN_USE_MODAL=NONE
+HOTFIX23_REBOOT_REQUIRED=NO
+
+LAST_OBSERVED_HOTFIX24_RUN=32448690449
+LAST_OBSERVED_HOTFIX24_JOB=96672917931
+HOTFIX24_FULL_SOURCE_BUILD=PASS
+HOTFIX24_PINNED_WIX_EXTENSIONS=PASS
+HOTFIX24_WIX_BUILD=FAIL
+HOTFIX24_SETUP_ICON_QA=BLOCKED_BY_WIX_BUILD
+HOTFIX24_TASKBAR_RUNTIME_QA=BLOCKED_BY_WIX_BUILD
+HOTFIX24_CANDIDATE_ARTIFACT=NOT_CREATED
+
+CURRENT_BLOCKER=HOTFIX24_WIX_GENERATED_POWERSHELL_PARSER_ERROR
+CURRENT_BLOCKER_OWNER=PR28_HOTFIX24_BUILDER
+CURRENT_BLOCKER_FILE=.release/build-wix-installer-hotfix24.ps1
+CURRENT_BLOCKER_EVIDENCE=JOB_96672917931_GENERATED_WRAPPER_LINE_43_PARSER_ERROR_AROUND_DOT_DOT_PATH_EXPRESSION
+CURRENT_BLOCKER_CLASS=BUILD_SCRIPT_GENERATION
+
+NEXT_ACTION=FIX_ONLY_THE_HOTFIX24_GENERATED_SCRIPT_INJECTION_QUOTING_OR_SCOPE_THAT_PRODUCES_THE_LINE_43_PARSER_ERROR_THEN_RERUN_THE_HOTFIX24_WORKFLOW
+NEXT_ACCEPTANCE_GATE=HOTFIX24_WIX_BUILD_PASS_THEN_CANONICAL_SETUP_ICON_AND_REAL_TASKBAR_WINDOW_ICON_RUNTIME_QA
+
+BUILD12_RELEASE_CANDIDATE=BLOCKED
+EXACT_FINAL_AV_VALIDATION=BLOCKED
+CODE_SIGNING=NOT_VERIFIED
+PRODUCTION_DISTRIBUTION=NOT_CONNECTED
+DESKTOP_AUTO_UPDATE=NOT_IMPLEMENTED
+BUILD13=BLOCKED_UNTIL_BUILD12_CLOSED
+ROADMAP_COMPLETE=false
+```
+
+### Execution rule
+
+Do not replay already evidenced work merely because it is not merged. First reconcile the active PR and live CI. Work only on `CURRENT_BLOCKER` until the next acceptance gate is reached. If repository/CI reality differs from this file, update this cursor from exact evidence before starting unrelated implementation.
+
+The active implementation PR was opened from an older `main` snapshot. Do not silently overwrite newer governance authority from current `main`; reconcile branch divergence before any eventual merge of PR #28.
+
+---
+
+## Canonical bootstrap and retained baseline evidence
+
+The block below records durable bootstrap/security facts. It must not be rewritten merely to make an active implementation look complete.
+
 ```text
 PROJECT=TNSuite BridgeX
 SOURCE_REPOSITORY=kyousuke33/TNSuite-BridgeX
@@ -43,22 +120,17 @@ WINDOWS_COMPILE_QA=NOT_RUN_FOR_BOOTSTRAP_PR
 GUI_RUNTIME=NOT_RUN_FOR_BOOTSTRAP_PR
 WINDOWS_COMPILE_BASELINE=PASS_FOR_PREVIOUS_USER_ACCEPTED_HOTFIX16_BUILD
 GUI_RUNTIME_BASELINE=USER_ACCEPTED_HOTFIX16
-DESKTOP_AUTO_UPDATE=NOT_IMPLEMENTED
 RCP_DESKTOP_DISTRIBUTION_PROFILE=NOT_DEFINED
 PORTAL_UPDATE_MANAGEMENT=NOT_IMPLEMENTED
 SIGNED_UPDATE_MANIFEST=NOT_IMPLEMENTED
-CODE_SIGNING=NOT_VERIFIED
-PRODUCTION_DISTRIBUTION=NOT_CONNECTED
 DATABASE=NOT_APPLICABLE
 WEB_HEALTH=NOT_APPLICABLE
 ```
 
-BridgeX `main` is now the canonical governed source authority for the accepted `v0.5 Build12-Hotfix16` baseline, established by bootstrap PR #3 merge SHA `14a18dc1b26c8910e85e724079df70a25ce7e690`. The exact pre-merge head `cc70d96582283b1866af612c55d90528cff6727e` passed GitHub-hosted governance run `32268088038` before merge.
+BridgeX `main` is the canonical governed source authority for the accepted `v0.5 Build12-Hotfix16` baseline, established by bootstrap PR #3 merge SHA `14a18dc1b26c8910e85e724079df70a25ce7e690`. The exact pre-merge head `cc70d96582283b1866af612c55d90528cff6727e` passed GitHub-hosted governance run `32268088038` before merge.
 
 BridgeX is public. Repository PR/source CI is routed only to GitHub-hosted infrastructure and is governed by canonical RCP contract `tnsuite.ci-public-repository-trust.v1` at RCP merge SHA `d65902e04406e088c29ee09cc64611179e66e754`. The previously configured shared `tn-ci-01-bridgex` runner has been removed from GitHub and its bounded host-side service, credentials, workspace, home/tmp/cache state and Unix identity have been removed from `tn-ci-01`.
 
 Repository owner confirmed the public governed main ruleset with no bypass actors is active. Required `governance` remains strict; public contributor code is not permitted to execute on shared TNSuite self-hosted infrastructure.
 
-The bootstrap proves canonical source integrity and governed source/static regression gates. It does not create a new Windows compile, installer-runtime, or GUI-runtime acceptance claim. The previously user-accepted Hotfix16 Windows build remains historical baseline evidence only.
-
-No planned Build13 capability may be promoted to PASS without exact evidence.
+The bootstrap proves canonical source integrity and governed source/static regression gates. It does not by itself create a current Windows compile, installer-runtime or GUI-runtime acceptance claim. Later active-PR evidence must remain bound to its exact source/run/artifact identity until safely merged/promoted.

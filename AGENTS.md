@@ -35,6 +35,72 @@ BridgeX pull requests, fork pull requests and external contributor code run only
 ## Safety
 Never commit generated installers/portable archives, build caches, local MSYS2/wxWidgets trees, runtime logs, tokens, signing keys or generated QA evidence. Public CI must not receive production/staging/database/signing/release credentials or TNSuite internal tokens. Build once and publish the exact verified artifact. Update checks may fail open for normal app use, but artifact verification must fail closed before execution.
 
+## Repository-specific roadmap execution contract
+
+This section operationalizes the project roadmap without weakening any centrally managed rule below.
+
+### Mandatory discovery before implementation
+
+Before making or proposing a source/build/release mutation, read and reconcile in this order:
+
+1. `docs/00_PRODUCT/PROJECT_BIG_PICTURE.md` — stable product North Star and phase model.
+2. `docs/00_PRODUCT/ROADMAP.md` — durable ordered milestones and exit gates.
+3. `docs/90_GOVERNANCE/CURRENT_STATE.md` — live execution cursor, exact blocker and next gate.
+4. `docs/90_GOVERNANCE/DECISIONS.md` — durable LOCKED decisions that must not be silently reopened.
+5. relevant `CHANGELOG.md`, work-item/PR evidence and actual GitHub/CI/runtime state.
+
+Chat memory may help locate evidence but must never replace this chain.
+
+### Required execution cursor
+
+Before changing code, explicitly determine:
+
+```text
+ACTIVE_RELEASE
+ACTIVE_PHASE
+ACTIVE_MILESTONE
+CURRENT_BLOCKER
+NEXT_ACCEPTANCE_GATE
+```
+
+If these cannot be determined from canonical authority plus actual repository/CI state, reconcile `CURRENT_STATE.md` before opening unrelated implementation work.
+
+### Scope discipline
+
+Every implementation must answer all three questions:
+
+1. Which active roadmap milestone does this advance?
+2. Which acceptance criterion or blocker does it satisfy?
+3. What exact evidence will prove it?
+
+If the change does not advance the active milestone, do not silently add it to the current workstream. Create/route a separate governed work item or leave it deferred.
+
+Do not:
+- start a later roadmap phase while an earlier required exit gate is unmet;
+- mix Build13 features into Build12 release hardening;
+- opportunistically refactor unrelated code while fixing a bounded blocker;
+- reopen a decision marked `LOCKED` without an explicit governed proposal;
+- replace exact evidence with assumptions from a previous build/hash;
+- mark active-PR evidence as canonical-main acceptance before the relevant source is safely merged.
+
+### Actual-state reconciliation
+
+Repository, CI and runtime evidence win over stale coordination prose. If actual state contradicts `CURRENT_STATE.md`:
+
+1. capture the exact source/PR/run/job/artifact evidence;
+2. update the live execution cursor to reflect reality;
+3. continue from the first unmet acceptance gate;
+4. do not replay already evidenced work merely because an older document is stale.
+
+### State maintenance
+
+After a meaningful state transition:
+- update `CURRENT_STATE.md` when the active cursor, blocker, evidence or next gate changes;
+- update `CHANGELOG.md` when product/source/release behavior changes materially;
+- update `ROADMAP.md` only when durable ordering, scope or exit criteria change;
+- update `DECISIONS.md` only for durable accepted decisions, not transient debugging notes;
+- keep `PROJECT_BIG_PICTURE.md` stable unless product purpose/direction materially changes through governance.
+
 <!-- TNSUITE:RCP-MANAGED-AGENTS:BEGIN -->
 TNSUITE_CENTRAL_AUTHORITY_PREFLIGHT=REQUIRED
 USER_PROMPT_GOVERNANCE_DEPENDENCY=NONE
@@ -51,8 +117,15 @@ CENTRAL_CAPABILITY_GAP_PROJECT_WORKAROUND=PROHIBITED
 CI_HOST_RUNTIME_AUTHORITY=NONE
 BUILD_ONCE_PROMOTE_SAME_ARTIFACT=REQUIRED
 PASS_WITHOUT_REQUIRED_EVIDENCE=PROHIBITED
+PROJECT_ROADMAP_GOVERNANCE=tnsuite.project-roadmap-governance.v1
+PROJECT_BIG_PICTURE_DISCOVERY=REQUIRED
+PROJECT_ROADMAP_DISCOVERY=REQUIRED
+PROJECT_CURRENT_STATE_DISCOVERY=REQUIRED
+ROADMAP_ACTUAL_STATE_WINS=REQUIRED
+ROADMAP_CHAT_MEMORY_AUTHORITY=NONE
+ROADMAP_ENABLED_AUTO_RESUME=REQUIRED
 TNSUITE_AGENTS_SYNC=RCP_MANAGED
-TNSUITE_AGENTS_POLICY_REVISION=2026-08-20.1
+TNSUITE_AGENTS_POLICY_REVISION=2026-08-20.2
 
 Central managed execution rules:
 1. Before managed implementation, load project-local authority and run the centrally versioned TNSuite Authority Preflight for declared subscriptions.
@@ -62,8 +135,11 @@ Central managed execution rules:
 5. A project receiving a valid external request must independently review the evidence and classify it as ACCEPTED, REJECTED_NOT_OWNED, NEEDS_MORE_EVIDENCE, DUPLICATE or SUPERSEDED. An accepted request that blocks another managed project must be tracked through the receiver's own governed work item, source QA, PR, required CI and safe merge.
 6. After an accepted external request is resolved, publish a resolution callback containing the request id, receiver project, resolution work item/PR, exact resolution source SHA, capability or fix identity and revalidation requirement. The requester must revalidate the original blocked condition before marking the dependency resolved and automatically resume only after that revalidation passes.
 7. When a proven central capability is missing, record or reuse the central dependency and park the child work item without consuming an active lane. Do not build a project-local shadow control plane, duplicated central protocol or workaround that bypasses central authority.
-8. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next phase without waiting for a new user prompt.
-9. Do not treat ordinary source edits, tests, PR creation, required CI, safe merge or phase continuation as human approval gates when canonical authority already defines the work.
-10. Human approval remains required where canonical policy explicitly requires it, including Production promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
-11. Never claim SOURCE_PASS, ARTIFACT_READY, STAGING_PASS, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority.
+8. For every repository classified roadmap_enabled=true, recover project intent in this order: AGENTS.md, PROJECT_BIG_PICTURE.md, ROADMAP.md, CURRENT_STATE.md, relevant evidence, live Work Item, then actual GitHub/CI/runtime state. Reconcile stale prose before mutation; actual state wins and chat memory is not authority.
+9. PROJECT_BIG_PICTURE.md is stable product-direction authority and must not become a moving PR/SHA/CI/blocker cursor. ROADMAP.md is ordered durable planning authority and must not replace CURRENT_STATE.md or the live Work Item.
+10. Do not fabricate PROJECT_BIG_PICTURE.md or ROADMAP.md for a repository classified DEFERRED because source/product authority is not established. Keep the repo explicitly deferred until evidence supports roadmap enablement.
+11. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next phase without waiting for a new user prompt.
+12. Do not treat ordinary source edits, tests, PR creation, required CI, safe merge or phase continuation as human approval gates when canonical authority already defines the work.
+13. Human approval remains required where canonical policy explicitly requires it, including Production promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
+14. Never claim SOURCE_PASS, ARTIFACT_READY, STAGING_PASS, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority.
 <!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
