@@ -66,13 +66,6 @@ jobs:
           $build = $build.Replace($exeNeedle, $exeReplacement)
           [IO.File]::WriteAllText((Resolve-Path $buildPath), $build, [Text.UTF8Encoding]::new($false))
 
-          $payloadQaPath = '.\qa\production_payload_check.py'
-          $payloadQa = Get-Content -LiteralPath $payloadQaPath -Raw -Encoding UTF8
-          $payloadNeedle = "    'bin/BridgeX.exe',"
-          if (-not $payloadQa.Contains($payloadNeedle)) { throw 'HF24_PAYLOAD_QA_ANCHOR_MISSING' }
-          $payloadQa = $payloadQa.Replace($payloadNeedle, $payloadNeedle + "`n    'bin/BridgeX-AppIcon.ico',")
-          [IO.File]::WriteAllText((Resolve-Path $payloadQaPath), $payloadQa, [Text.UTF8Encoding]::new($false))
-
           $icon = '.\assets\branding\BridgeX-AppIcon.ico'
           $sidebar = '.\installer\BridgeX-Setup-Sidebar.bmp'
           if ((Get-FileHash -Algorithm SHA256 $icon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_CANONICAL_ICON_HASH_FAIL' }
@@ -88,6 +81,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "HF24_FULL_RUNTIME_BUILD_FAILED=$LASTEXITCODE" }
           $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
           if (-not (Test-Path -LiteralPath $portable)) { throw "HF24_PORTABLE_MISSING=$portable" }
+
+          # Validate Hotfix24-only runtime icon against the real package after the
+          # baseline Hotfix12 synthetic payload fixture has completed unchanged.
+          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix24-PortableProbe'
+          if (Test-Path $probe) { Remove-Item $probe -Recurse -Force }
+          Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+          $runtimeIcon = Join-Path $probe 'bin\BridgeX-AppIcon.ico'
+          if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF24_PORTABLE_ICON_MISSING' }
+          if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_PORTABLE_ICON_HASH_FAIL' }
+          Write-Host 'HF24_RUNTIME_ICON_PACKAGE_QA=PASS'
           Write-Host 'HF24_WINDOWS_COMPILE_QA=PASS'
           Write-Host "HF24_RUNTIME_PORTABLE=$portable"
 
