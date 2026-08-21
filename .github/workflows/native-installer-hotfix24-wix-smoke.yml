@@ -1,0 +1,91 @@
+name: BridgeX Hotfix24 WiX Smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  hotfix24-wix-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      CANONICAL_ARTIFACT_ID: '9405996175'
+      WIX_VERSION: '6.0.0'
+      ICON_SHA256: '06266307acb6a92aca9742dac59dd053029075256a30eec50a37a71e08296328'
+      SIDEBAR_SHA256: 'a54496bf465f8bc7e71269ad48b6c10e995656051c6c39a0c820ee0d30343de2'
+
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@v4
+
+      - name: Download green canonical runtime payload
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'canonical-artifact.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'canonical-artifact'
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          Invoke-WebRequest -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:CANONICAL_ARTIFACT_ID/zip" -OutFile $zip -MaximumRedirection 8
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
+          if (-not (Test-Path -LiteralPath $portable)) { throw "HF24_SMOKE_CANONICAL_PORTABLE_MISSING=$portable" }
+          New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist-hf24-smoke') | Out-Null
+          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist-hf24-smoke\runtime.zip') -Force
+          if ((Get-FileHash -Algorithm SHA256 '.\assets\branding\BridgeX-AppIcon.ico').Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_SMOKE_CANONICAL_ICON_HASH_FAIL' }
+          if ((Get-FileHash -Algorithm SHA256 '.\installer\BridgeX-Setup-Sidebar.bmp').Hash.ToLowerInvariant() -ne $env:SIDEBAR_SHA256) { throw 'HF24_SMOKE_CLASSIC_SIDEBAR_HASH_FAIL' }
+          Write-Host 'HF24_SMOKE_RUNTIME_PAYLOAD=PASS'
+          Write-Host 'HF24_SMOKE_BRANDING_ASSETS=PASS'
+
+      - name: Install pinned WiX extensions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install --global wix --version $env:WIX_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "WIX_TOOL_INSTALL_FAILED=$LASTEXITCODE" }
+          wix extension add -g "WixToolset.BootstrapperApplications.wixext/$env:WIX_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'WIX_BAL_EXTENSION_INSTALL_FAILED' }
+          wix extension add -g "WixToolset.Util.wixext/$env:WIX_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'WIX_UTIL_EXTENSION_INSTALL_FAILED' }
+          wix --version
+
+      - name: Build Hotfix24 WiX smoke candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = Join-Path $PWD 'dist-hf24-smoke'
+          $portable = Join-Path $out 'runtime.zip'
+          $qa = Join-Path $out 'Hotfix24-WiX-Smoke-QA.txt'
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix24.ps1 -PortableZip $portable -OutputDirectory $out 2>&1 | Tee-Object -FilePath $qa
+          $exitCode = $LASTEXITCODE
+          "HF24_SMOKE_EXIT_CODE=$exitCode" | Tee-Object -FilePath $qa -Append
+          if ($exitCode -ne 0) { throw "HF24_SMOKE_WIX_BUILD_FAILED=$exitCode" }
+          $setup = Join-Path $out 'TNSuiteBridgeX_260821_v0.5-Build12-Hotfix24-WiX-Setup.exe'
+          $msi = Join-Path $out 'TNSuiteBridgeX_260821_v0.5-Build12-Hotfix24-WiX.msi'
+          foreach ($artifact in @($setup,$msi)) {
+            if (-not (Test-Path -LiteralPath $artifact)) { throw "HF24_SMOKE_ARTIFACT_MISSING=$artifact" }
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact).Hash.ToLowerInvariant()
+            "HF24_SMOKE_ARTIFACT_SHA256 file=$([IO.Path]::GetFileName($artifact)) sha256=$hash" | Tee-Object -FilePath $qa -Append
+          }
+          Write-Host 'HF24_SMOKE_WIX_BUILD=PASS'
+
+      - name: Upload Hotfix24 WiX smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-hotfix24-wix-smoke-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist-hf24-smoke/Hotfix24-WiX-Smoke-QA.txt
+            dist-hf24-smoke/TNSuiteBridgeX_260821_v0.5-Build12-Hotfix24-WiX-Setup.exe
+            dist-hf24-smoke/TNSuiteBridgeX_260821_v0.5-Build12-Hotfix24-WiX.msi
+          if-no-files-found: error
+          retention-days: 3
