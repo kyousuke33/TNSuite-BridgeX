@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PortableZip,
-    [Parameter(Mandatory = $true)][string]$OutputDirectory
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [Parameter(Mandatory = $true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$ExpectedBridgeXSha256
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ExpectedBridgeXSha256 = $ExpectedBridgeXSha256.ToLowerInvariant()
 
 $hotfix23 = Join-Path $PSScriptRoot 'build-wix-installer-hotfix23.ps1'
 foreach ($required in @(
@@ -46,12 +48,13 @@ if (-not (Test-Path -LiteralPath $classicSidebar)) { throw "HOTFIX24_CLASSIC_SID
 $actualIconSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalIcon).Hash.ToLowerInvariant()
 if ($actualIconSha256 -ne $expectedIconSha256) { throw "HOTFIX24_CANONICAL_ICON_HASH_FAIL=$actualIconSha256" }
 
-# Hotfix24 intentionally changes BridgeX.exe by applying the real HWND icon
-# patch. Keep the base WiX integrity gate fail-closed, but pin it to the exact
-# Hotfix24 runtime hash proven by the full-source build instead of Hotfix16's
-# pre-patch executable hash. Do not weaken or remove the payload hash check.
+# Hotfix24 source builds are not bit-reproducible across independent CI runs
+# because the native PE carries build-specific metadata. Preserve the base WiX
+# exact-hash gate, but pin it to the SHA exported by the preceding source-build
+# step for this same portable payload. This detects any mutation between build
+# and packaging without pretending two independent compiles must hash equally.
 $baseLoadNeedle = '$text = Get-Content -LiteralPath $basePath -Raw -Encoding UTF8'
-$runtimeHashOverride = '$text = $text.Replace(''9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'', ''3fb8b43400050c435500e3122167f85ec25bef0f30602321aca81f073ab360b6'')'
+$runtimeHashOverride = '$text = $text.Replace(''9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'', ''__HOTFIX24_RUNTIME_SHA256__'')'
 if (-not $source.Contains($baseLoadNeedle)) { throw 'HOTFIX24_RUNTIME_HASH_OVERRIDE_ANCHOR_MISSING' }
 $source = $source.Replace($baseLoadNeedle, $baseLoadNeedle + "`r`n" + $runtimeHashOverride)
 
@@ -73,8 +76,10 @@ $source = $source.Replace($logoXmlNeedle, $logoXmlReplacement)
 $source = $source.Replace("Write-Host 'INSTALLER_ICON_SOURCE=BRIDGEX_EXE'", "Write-Host 'INSTALLER_ICON_SOURCE=CANONICAL_MULTIRES_ICO'")
 $source = $source.Replace("Write-Host 'INSTALLER_LOGO_SOURCE=BRIDGEX_EXE'", "Write-Host 'INSTALLER_LOGO_SOURCE=HOTFIX16_CLASSIC_SIDEBAR'")
 '@
+$override = $override.Replace('__HOTFIX24_RUNTIME_SHA256__', $ExpectedBridgeXSha256)
 $script = $script.Replace($loadNeedle, $loadNeedle + "`r`n" + $override)
 
+Write-Host "HOTFIX24_EXPECTED_RUNTIME_SHA256=$ExpectedBridgeXSha256"
 $temp = Join-Path $PSScriptRoot ".BridgeX-Hotfix24-Driver-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.ps1"
 try {
     [System.IO.File]::WriteAllText($temp, $script, [System.Text.UTF8Encoding]::new($false))

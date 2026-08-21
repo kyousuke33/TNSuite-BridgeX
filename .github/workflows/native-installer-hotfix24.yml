@@ -82,14 +82,26 @@ jobs:
           $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
           if (-not (Test-Path -LiteralPath $portable)) { throw "HF24_PORTABLE_MISSING=$portable" }
 
-          # Validate Hotfix24-only runtime icon against the real package after the
-          # baseline Hotfix12 synthetic payload fixture has completed unchanged.
+          # Validate Hotfix24-only runtime identity against the real package after
+          # the baseline Hotfix12 synthetic payload fixture has completed unchanged.
           $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix24-PortableProbe'
           if (Test-Path $probe) { Remove-Item $probe -Recurse -Force }
           Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+          $runtimeExe = Join-Path $probe 'bin\BridgeX.exe'
           $runtimeIcon = Join-Path $probe 'bin\BridgeX-AppIcon.ico'
+          if (-not (Test-Path -LiteralPath $runtimeExe)) { throw 'HF24_PORTABLE_RUNTIME_MISSING' }
           if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF24_PORTABLE_ICON_MISSING' }
           if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_PORTABLE_ICON_HASH_FAIL' }
+
+          # The native source build is not bit-reproducible across independent CI
+          # runs. Capture the exact runtime SHA here, before packaging, and pass it
+          # to the WiX step as a cross-step provenance assertion. The WiX builder
+          # must reject the portable if BridgeX.exe changes after this point.
+          $runtimeSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeExe).Hash.ToLowerInvariant()
+          if ($runtimeSha256 -notmatch '^[0-9a-f]{64}$') { throw "HF24_RUNTIME_SHA256_INVALID=$runtimeSha256" }
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "HF24_RUNTIME_SHA256=$runtimeSha256`n", [Text.UTF8Encoding]::new($false))
+          Write-Host "HF24_RUNTIME_SHA256=$runtimeSha256"
+          Write-Host 'HF24_RUNTIME_PROVENANCE_SOURCE=PASS'
           Write-Host 'HF24_RUNTIME_ICON_PACKAGE_QA=PASS'
           Write-Host 'HF24_WINDOWS_COMPILE_QA=PASS'
           Write-Host "HF24_RUNTIME_PORTABLE=$portable"
@@ -108,12 +120,18 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          if ($env:HF24_RUNTIME_SHA256 -notmatch '^[0-9a-f]{64}$') { throw "HF24_RUNTIME_PROVENANCE_ENV_INVALID=$env:HF24_RUNTIME_SHA256" }
           $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
           $out = Join-Path $PWD 'dist-hf24'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           $qa = Join-Path $out 'TNSuiteBridgeX_260821_v0.5-Build12-Hotfix24-WiX-QA.txt'
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix24.ps1 -PortableZip $portable -OutputDirectory $out 2>&1 | Tee-Object -FilePath $qa
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix24.ps1 -PortableZip $portable -OutputDirectory $out -ExpectedBridgeXSha256 $env:HF24_RUNTIME_SHA256 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "HF24_WIX_BUILD_FAILED=$LASTEXITCODE" }
+          $qaText = Get-Content -LiteralPath $qa -Raw -Encoding UTF8
+          $provenanceMarker = "BRIDGEX_CANONICAL_HASH=PASS sha256=$env:HF24_RUNTIME_SHA256"
+          if (-not $qaText.Contains($provenanceMarker)) { throw "HF24_RUNTIME_PROVENANCE_MARKER_MISSING=$provenanceMarker" }
+          "HF24_RUNTIME_PROVENANCE=PASS sha256=$env:HF24_RUNTIME_SHA256" | Tee-Object -FilePath $qa -Append
+          Write-Host "HF24_RUNTIME_PROVENANCE=PASS sha256=$env:HF24_RUNTIME_SHA256"
           $setup = Join-Path $out $env:HF24_SETUP_NAME
           if (-not (Test-Path -LiteralPath $setup)) { throw "HF24_SETUP_MISSING=$setup" }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
