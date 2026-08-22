@@ -31,6 +31,7 @@ if MARKER in text:
 headers = (
     "#include <wx/filename.h>\n",
     "#include <wx/iconbndl.h>\n",
+    "#include <wx/image.h>\n",
     "#include <wx/stdpaths.h>\n",
 )
 for header in headers:
@@ -88,8 +89,14 @@ icon_code = r'''
 #ifdef __WXMSW__
 	// TNSUITE_BRIDGEX_BUILD12_HF24_TASKBAR_ICON
 	// BridgeX-AppIcon.ico is copied next to BridgeX.exe by the Hotfix24 runtime
-	// adapter. AddIcon imports every size stored in the original ICO and SetIcons
-	// applies the bundle to the top-level window used by the Windows taskbar.
+	// adapter. wxIconBundle loads ICO files through wxImage, but only the BMP
+	// handler is registered by default. Register the ICO handler explicitly so
+	// startup never emits "No image handler for type 3 defined." (ICO == type 3).
+	// FindHandler prevents duplicate registration if upstream initializes it.
+	if (!wxImage::FindHandler(wxBITMAP_TYPE_ICO)) {
+		wxImage::AddHandler(new wxICOHandler);
+	}
+
 	wxFileName const bridgeXExecutable(wxStandardPaths::Get().GetExecutablePath());
 	wxString const bridgeXIconPath = bridgeXExecutable.GetPathWithSep() + L"BridgeX-AppIcon.ico";
 	wxIconBundle bridgeXIcons;
@@ -103,8 +110,15 @@ text = text[: brace + 1] + icon_code + text[brace + 1 :]
 mainfrm.write_text(text, encoding="utf-8", newline="\n")
 
 check = mainfrm.read_text(encoding="utf-8")
-for required in (MARKER, "SetIcons(bridgeXIcons)", "BridgeX-AppIcon.ico"):
+for required in (
+    MARKER,
+    "wxImage::FindHandler(wxBITMAP_TYPE_ICO)",
+    "wxImage::AddHandler(new wxICOHandler)",
+    "SetIcons(bridgeXIcons)",
+    "BridgeX-AppIcon.ico",
+):
     if required not in check:
         raise SystemExit(f"HF24_PATCH_FAIL: missing post-patch marker: {required}")
 
 print("HOTFIX24_TASKBAR_ICON_PATCH=PASS")
+print("HOTFIX24_ICO_IMAGE_HANDLER=PASS")
