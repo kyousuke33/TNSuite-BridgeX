@@ -1,0 +1,44 @@
+name: Export Hotfix25 Source Temp
+
+on:
+  push:
+    branches:
+      - tmp/export-hotfix25-source-20260822
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable Hotfix25 source
+        uses: actions/checkout@v4
+        with:
+          ref: 980f1cfa6058c55e3e7fb5e3b5a103de2d04b9c7
+          path: export-source
+          fetch-depth: 1
+
+      - name: Package full source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = Join-Path $env:GITHUB_WORKSPACE 'export-source'
+          $git = Join-Path $src '.git'
+          if (Test-Path -LiteralPath $git) { Remove-Item -LiteralPath $git -Recurse -Force }
+          $out = Join-Path $env:GITHUB_WORKSPACE 'TNSuite-BridgeX_260822_Build12-Hotfix25-FullSource_980f1cfa.zip'
+          if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Force }
+          & tar.exe -a -c -f $out -C $src .
+          if ($LASTEXITCODE -ne 0) { throw "SOURCE_ZIP_FAILED=$LASTEXITCODE" }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToLowerInvariant()
+          Write-Host "SOURCE_COMMIT=980f1cfa6058c55e3e7fb5e3b5a103de2d04b9c7"
+          Write-Host "SOURCE_ZIP_SHA256=$hash"
+
+      - name: Upload source ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-hotfix25-full-source-980f1cfa
+          path: TNSuite-BridgeX_260822_Build12-Hotfix25-FullSource_980f1cfa.zip
+          if-no-files-found: error
+          retention-days: 7
