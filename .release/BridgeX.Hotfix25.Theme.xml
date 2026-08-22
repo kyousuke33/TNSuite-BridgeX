@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Hotfix25: dark BridgeX installer theme with full-height classic sidebar; maintenance behavior remains WixStdBA. -->
+<!-- Hotfix25: dark BridgeX installer theme with full-height sidebar; maintenance behavior remains WixStdBA. -->
 <Theme xmlns="http://wixtoolset.org/schemas/v4/thmutil">
   <!-- Colors are BGR hex per ThmUtil. Keep native buttons/edit boxes readable while the content surface is dark. -->
   <Font Id="0" Height="-12" Weight="500" Foreground="btntext" Background="btnface">Segoe UI</Font>
   <Font Id="1" Height="-22" Weight="600" Foreground="ffffff" Background="271810">Segoe UI</Font>
   <Font Id="2" Height="-16" Weight="500" Foreground="c7b8a7" Background="271810">Segoe UI</Font>
   <Font Id="3" Height="-12" Weight="500" Foreground="eeeae6" Background="271810">Segoe UI</Font>
-  <Font Id="4" Height="-12" Weight="400" Foreground="311d0d" Background="311d0d">Segoe UI</Font>
-  <Font Id="5" Height="-12" Weight="400" Foreground="271810" Background="271810">Segoe UI</Font>
+  <Font Id="5" Height="-12" Weight="400" Foreground="eeeae6" Background="271810">Segoe UI</Font>
   <Font Id="6" Height="-12" Weight="500" Foreground="windowtext" Background="window">Segoe UI</Font>
 
-  <Window Width="620" Height="390" HexStyle="100a0000" FontId="0" Caption="#(loc.Caption)">
-    <!-- Paint both columns explicitly. Height=0 means extend to the bottom of the client area. -->
-    <Label X="0" Y="0" Width="164" Height="0" FontId="4" Visible="yes" DisablePrefix="yes"> </Label>
-    <Label X="164" Y="0" Width="0" Height="0" FontId="5" Visible="yes" DisablePrefix="yes"> </Label>
-    <!-- Keep the original 164x314 Hotfix16 artwork at native aspect ratio; the dark fill above extends the sidebar to full height. -->
-    <ImageControl X="0" Y="0" Width="164" Height="314" ImageFile="logo.png" Visible="yes" />
+  <Window Width="620" Height="390" HexStyle="100a0000" FontId="5" Caption="#(loc.Caption)">
+    <!-- The window itself paints the dark client surface. No full-window label overlays are used,
+         because they can obscure page controls in WixStdBA. The Hotfix25 sidebar asset is
+         authored at 164x390, has no cyan edge stripe, and therefore fills the full client height
+         without stretching or covering the button row. -->
+    <ImageControl X="0" Y="0" Width="164" Height="390" ImageFile="logo.png" Visible="yes" />
     <Label X="184" Y="18" Width="-18" Height="34" FontId="1" Visible="yes" DisablePrefix="yes">#(loc.Title)</Label>
     <Label X="184" Y="48" Width="-18" Height="24" FontId="2" Visible="yes" DisablePrefix="yes">Secure Transfer &amp; Automation</Label>
 
