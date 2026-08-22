@@ -162,15 +162,3 @@ msgstr "Khởi động ngay"
 
 msgid "Later"
 msgstr "Để sau"
-
-# BridgeX override for the three FileZilla password-storage modes. Upstream
-# Vietnamese currently collapses all three radio labels to the same wording,
-# making the security choice ambiguous in Settings > Interface > Passwords.
-msgid "Sav&e passwords"
-msgstr "&Lưu mật khẩu"
-
-msgid "D&o not save passwords"
-msgstr "&Không lưu mật khẩu"
-
-msgid "Sa&ve passwords protected by a master password"
-msgstr "Lưu mật khẩu, &bảo vệ bằng mật khẩu chính"

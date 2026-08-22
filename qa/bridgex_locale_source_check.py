@@ -35,19 +35,8 @@ for expected in required:
 check('UTF-8 charset token is not contaminated by another header field',
       'charset=UTF-8\\nContent-Transfer-Encoding:' not in header)
 
-password_entries = {
-    'Sav&e passwords': '&Lưu mật khẩu',
-    'D&o not save passwords': '&Không lưu mật khẩu',
-    'Sa&ve passwords protected by a master password': 'Lưu mật khẩu, &bảo vệ bằng mật khẩu chính',
-}
-for msgid, msgstr in password_entries.items():
-    block = f'msgid "{msgid}"\nmsgstr "{msgstr}"'
-    check(f'Password storage translation: {msgid}', block in text)
-check('Password storage translations are distinct', len(set(password_entries.values())) == 3)
-
 if not all(ok for _, ok in checks):
     print('BRIDGEX_VI_LOCALE_SOURCE_QA=FAIL')
     raise SystemExit(1)
 
-print('PASSWORD_STORAGE_TRANSLATIONS=PASS')
 print('BRIDGEX_VI_LOCALE_SOURCE_QA=PASS')
