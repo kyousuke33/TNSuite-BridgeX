@@ -106,8 +106,17 @@ TNSUITE_CENTRAL_AUTHORITY_PREFLIGHT=REQUIRED
 USER_PROMPT_GOVERNANCE_DEPENDENCY=NONE
 PROJECT_LOCAL_CENTRAL_AUTHORITY_WEAKENING=PROHIBITED
 GITHUB_MAIN_CANONICAL_SOURCE=REQUIRED
+ACTIVE_PROJECT_SCOPE_LOCK=REQUIRED
+PROJECT_CHAT_MUTATION_SCOPE=ACTIVE_PROJECT_ONLY
 PROJECT_MUTATION_SCOPE=SELF_ONLY
 CROSS_PROJECT_MUTATION=PROHIBITED
+CROSS_PROJECT_READ_FOR_DIAGNOSIS=ALLOWED
+CROSS_PROJECT_FIX_FROM_FOREIGN_WORKSTREAM=PROHIBITED
+EXTERNAL_DEFECT_ROUTE_TO_OWNER_WORK_ITEM=REQUIRED
+EXTERNAL_DEPENDENCY_HANDOFF=REQUIRED
+RCP_MUTATION_FROM_CHILD_PROJECT_WORKSTREAM=PROHIBITED
+CHILD_PROJECT_MUTATION_FROM_RCP_TRIAGE=PROHIBITED
+SCOPE_EXPANSION_REQUIRES_EXPLICIT_USER_SWITCH=REQUIRED
 CROSS_PROJECT_DEFECT_REQUEST_REQUIRES_PROVEN_OWNERSHIP=REQUIRED
 UNKNOWN_DEFECT_RCP_TRIAGE=REQUIRED
 VALID_EXTERNAL_REQUEST_MUST_BE_REVIEWED=REQUIRED
@@ -144,26 +153,33 @@ ROADMAP_ACTUAL_STATE_WINS=REQUIRED
 ROADMAP_CHAT_MEMORY_AUTHORITY=NONE
 ROADMAP_ENABLED_AUTO_RESUME=REQUIRED
 TNSUITE_AGENTS_SYNC=RCP_MANAGED
-TNSUITE_AGENTS_POLICY_REVISION=2026-08-23.1
+TNSUITE_AGENTS_POLICY_REVISION=2026-08-24.1
 
 Central managed execution rules:
 1. The project is product/source authority for its own repository. Ordinary requirement implementation, source edits, branches, Pull Requests, project CI, safe merge, exact-SHA build/artifact creation and local/dev validation do not require separate RCP release approval.
 2. Before managed implementation, load project-local authority and run the centrally versioned TNSuite Authority Preflight only for declared shared-authority subscriptions that the affected scope actually consumes; an unavailable unrelated central capability must not block independent source/CI/build work.
-3. An agent may mutate only its own repository/project scope. It may inspect other governed repositories read-only when necessary for diagnosis, but must not edit another project to unblock itself.
-4. A compliant dedicated CI runner is project CI infrastructure. It may be provisioned or maintained without RCP release registration, target registration or Production approval when it conforms to the central CI host contract and has no Production authority.
-5. Project CI workflow topology must conform to tnsuite.project-ci-workflow-governance.v1: responsibility-driven consolidation, hard maximum 5 active workflow files unless an explicit architecture exception exists, no duplicate/versioned/debug workflow owners, always-present required PR checks, and no coverage reduction merely to lower workflow count.
-6. Staging is retired from the active TNSuite release architecture. Do not provision, onboard, enable or require a Staging environment or STAGING_PASS for new releases. Preserve historical staging evidence as historical evidence only. After exact-SHA build/artifact, continue to the separately authorized target deployment/publication and target runtime/live acceptance while preserving all Production, DB, destructive-operation, secret/root and security gates.
-7. Create or reuse a governed cross-project defect request only when evidence proves the defect is owned by the target project. The request must identify the requester, exact dependent work item/capability/release/Production scope, observed and expected behavior, exact evidence/source references, ownership rationale and required outcome.
-8. When ownership is UNKNOWN or only suspected, do not assign blame or request a fix from another project. Escalate a diagnostic request to RCP. RCP may investigate across relevant projects and central authorities read-only, establish ownership, coalesce related failures and recommend routing, but must not mutate child-project source during triage.
-9. A project receiving a valid external request must independently review the evidence and classify it as ACCEPTED, REJECTED_NOT_OWNED, NEEDS_MORE_EVIDENCE, DUPLICATE or SUPERSEDED. An accepted request is tracked through the receiver's own governed work item, source QA, PR, required CI and safe merge.
-10. A proven central capability gap blocks only the minimum affected scope. Create or reuse the central dependency, mark the exact dependent work item/capability/release/Production scope blocked, release that active lane if appropriate, and keep unrelated workstreams schedulable. Do not normalize a scoped dependency into a project-wide block unless whole-project impact is separately proven.
-11. Do not build a project-local shadow control plane, duplicated central protocol or competing multi-project release/artifact/approval/scheduler authority. Safe project-local build, test and deploy hooks remain allowed inside project and environment authority.
-12. After an accepted external request is resolved, publish a resolution callback containing the request id, receiver project, resolution work item/PR, exact resolution source SHA, capability or fix identity and revalidation requirement. The requester must revalidate only the affected scope before marking the dependency resolved; independent scopes never wait for this callback.
-13. For every repository classified roadmap_enabled=true, recover project intent in this order: AGENTS.md, PROJECT_BIG_PICTURE.md, ROADMAP.md, CURRENT_STATE.md, relevant evidence, live Work Item, then actual GitHub/CI/runtime state. Reconcile stale prose before mutation; actual state wins and chat memory is not authority.
-14. PROJECT_BIG_PICTURE.md is stable product-direction authority and must not become a moving PR/SHA/CI/blocker cursor. ROADMAP.md is ordered durable planning authority and must not replace CURRENT_STATE.md or the live Work Item.
-15. Do not fabricate PROJECT_BIG_PICTURE.md or ROADMAP.md for a repository classified DEFERRED because source/product authority is not established. Keep the repo explicitly deferred until evidence supports roadmap enablement.
-16. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next independent phase/workstream without waiting for a new user prompt.
-17. Human approval remains required only where canonical policy requires a real privileged or risk decision, including Production deployment/promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
-18. Platform Contract incompatibility blocks only scopes that consume the incompatible contract. A project may pin a compatible immutable contract version/SHA and continue independent engineering work.
-19. Never claim SOURCE_PASS, ARTIFACT_READY, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority. Historical STAGING_PASS evidence remains historical and is not an active release prerequisite.
+3. The active project for a conversation/workstream is the only mutation scope. Autonomous execution, auto-resume and blocker repair are permitted only inside that active project scope and may not expand it for convenience.
+4. A project workstream may inspect other projects, but it may never implement, deploy, or mutate them. Cross-project problems are routed to their owner; they are not fixed from the foreign workstream.
+5. Before every mutation, ask whether the mutation belongs to the active project. If the answer is NO or UNKNOWN, mutation is prohibited and the action is limited to read-only diagnosis or governed handoff metadata.
+6. Cross-project read-only inspection is allowed only as needed to verify a dependency, compare a contract/policy, establish defect ownership or collect evidence for the active project. Creating or updating a governed dependency/request Work Item at the proven owner is routing metadata, not permission to implement there.
+7. When the active project detects an external problem: diagnose read-only, establish ownership, create or reuse the governed owner request, record exact evidence plus affected scope and resume condition, block only the dependent scope, continue unrelated active-project work, and stop cross-project implementation.
+8. A child-project workstream must not mutate RCP source/runtime, and an RCP diagnostic/triage workstream must not mutate child-project source/runtime. Runtime restart/deploy/service mutation is implementation and follows the same active-project scope lock.
+9. Mutation scope changes only when the user explicitly switches project, a new project workstream is explicitly started, or a canonical handoff explicitly rebinds the active project. After a scope switch, load the new project's AGENTS.md and current authority before mutation; never infer a switch merely because a dependency blocks progress.
+10. If active-project scope lock conflicts with auto-resume or autonomous convenience, the priority is ACTIVE_PROJECT_SCOPE_LOCK over AUTO_RESUME over CONVENIENCE.
+11. A compliant dedicated CI runner is project CI infrastructure. It may be provisioned or maintained without RCP release registration, target registration or Production approval when it conforms to the central CI host contract and has no Production authority.
+12. Project CI workflow topology must conform to tnsuite.project-ci-workflow-governance.v1: responsibility-driven consolidation, hard maximum 5 active workflow files unless an explicit architecture exception exists, no duplicate/versioned/debug workflow owners, always-present required PR checks, and no coverage reduction merely to lower workflow count.
+13. Staging is retired from the active TNSuite release architecture. Do not provision, onboard, enable or require a Staging environment or STAGING_PASS for new releases. Preserve historical staging evidence as historical evidence only. After exact-SHA build/artifact, continue to the separately authorized target deployment/publication and target runtime/live acceptance while preserving all Production, DB, destructive-operation, secret/root and security gates.
+14. Create or reuse a governed cross-project defect request only when evidence proves the defect is owned by the target project. The request must identify the requester, exact dependent work item/capability/release/Production scope, observed and expected behavior, exact evidence/source references, ownership rationale and required outcome.
+15. When ownership is UNKNOWN or only suspected, do not assign blame or request a fix from another project. Escalate a diagnostic request to RCP. RCP may investigate across relevant projects and central authorities read-only, establish ownership, coalesce related failures and recommend routing, but must not mutate child-project source during triage.
+16. A project receiving a valid external request must independently review the evidence and classify it as ACCEPTED, REJECTED_NOT_OWNED, NEEDS_MORE_EVIDENCE, DUPLICATE or SUPERSEDED. An accepted request is tracked through the receiver's own governed work item, source QA, PR, required CI and safe merge.
+17. A proven central capability gap blocks only the minimum affected scope. Create or reuse the central dependency, mark the exact dependent work item/capability/release/Production scope blocked, release that active lane if appropriate, and keep unrelated workstreams schedulable. Do not normalize a scoped dependency into a project-wide block unless whole-project impact is separately proven.
+18. Do not build a project-local shadow control plane, duplicated central protocol or competing multi-project release/artifact/approval/scheduler authority. Safe project-local build, test and deploy hooks remain allowed inside project and environment authority.
+19. After an accepted external request is resolved, publish a resolution callback containing the request id, receiver project, resolution work item/PR, exact resolution source SHA, capability or fix identity and revalidation requirement. The requester must revalidate only the affected scope before marking the dependency resolved; independent scopes never wait for this callback.
+20. For every repository classified roadmap_enabled=true, recover project intent in this order: AGENTS.md, PROJECT_BIG_PICTURE.md, ROADMAP.md, CURRENT_STATE.md, relevant evidence, live Work Item, then actual GitHub/CI/runtime state. Reconcile stale prose before mutation; actual state wins and chat memory is not authority.
+21. PROJECT_BIG_PICTURE.md is stable product-direction authority and must not become a moving PR/SHA/CI/blocker cursor. ROADMAP.md is ordered durable planning authority and must not replace CURRENT_STATE.md or the live Work Item.
+22. Do not fabricate PROJECT_BIG_PICTURE.md or ROADMAP.md for a repository classified DEFERRED because source/product authority is not established. Keep the repo explicitly deferred until evidence supports roadmap enablement.
+23. When the repository has a deterministic canonical roadmap/current-state chain, continue ordinary roadmap work autonomously through source QA, PR, required CI, safe merge and the next independent phase/workstream without waiting for a new user prompt, but only inside the active project mutation scope.
+24. Human approval remains required only where canonical policy requires a real privileged or risk decision, including Production deployment/promotion, Production database mutation, destructive operations, unavailable real-host secret/root access, material security/architecture decisions, or unresolved product decisions.
+25. Platform Contract incompatibility blocks only scopes that consume the incompatible contract. A project may pin a compatible immutable contract version/SHA and continue independent engineering work.
+26. Never claim SOURCE_PASS, ARTIFACT_READY, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority. Historical STAGING_PASS evidence remains historical and is not an active release prerequisite.
 <!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
