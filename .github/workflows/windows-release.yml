@@ -11,6 +11,10 @@ on:
         description: Legacy publication switch; must remain false while verified-artifact promotion is enforced
         required: true
         type: boolean
+      artifact_class:
+        description: RCP artifact retention class for this build output
+        required: true
+        type: string
 
 jobs:
   release:
@@ -49,7 +53,7 @@ jobs:
           Write-Host 'REMEDIATION_RELEASE_IDENTITY=Build12-Hotfix17'
           Write-Host 'WITHDRAWN_HOTFIX16_IDENTITY_REUSED=NO'
 
-      - name: Determine execution mode
+      - name: Determine execution and artifact policy
         id: plan
         shell: pwsh
         run: |
@@ -57,9 +61,40 @@ jobs:
           if ('${{ inputs.publish_release }}' -eq 'true') {
             throw 'DIRECT_PUBLICATION_DISABLED_USE_VERIFIED_ARTIFACT_PROMOTION'
           }
+
+          $artifactClass = '${{ inputs.artifact_class }}'
+          if ($artifactClass -eq 'PR_TEST_EVIDENCE') {
+            if ('${{ github.event_name }}' -ne 'pull_request') {
+              throw 'PR_TEST_EVIDENCE_REQUIRES_PULL_REQUEST_EVENT'
+            }
+            $artifactName = "bridgex-pr-test-$env:BRIDGEX_SOURCE_SHA"
+            $retentionDays = 2
+            $promotionAuthority = 'NONE'
+          }
+          elseif ($artifactClass -eq 'IMMUTABLE_RELEASE_CANDIDATE') {
+            if ('${{ github.event_name }}' -ne 'push' -or '${{ github.ref }}' -ne 'refs/heads/main') {
+              throw 'IMMUTABLE_RELEASE_CANDIDATE_REQUIRES_MAIN_PUSH'
+            }
+            $artifactName = "bridgex-release-$env:BRIDGEX_SOURCE_SHA"
+            $retentionDays = 30
+            $promotionAuthority = 'CANONICAL_MAIN_CANDIDATE'
+          }
+          else {
+            throw "ARTIFACT_CLASS_INVALID=$artifactClass"
+          }
+
           'build=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           'publish=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "retention_days=$retentionDays" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "artifact_class=$artifactClass" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "promotion_authority=$promotionAuthority" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
           Write-Host 'WINDOWS_RELEASE_MODE=BUILD_EVIDENCE_ONLY'
+          Write-Host "BRIDGEX_ARTIFACT_CLASS=$artifactClass"
+          Write-Host "BRIDGEX_ARTIFACT_NAME=$artifactName"
+          Write-Host "BRIDGEX_ARTIFACT_RETENTION_DAYS=$retentionDays"
+          Write-Host "BRIDGEX_PROMOTION_AUTHORITY=$promotionAuthority"
           Write-Host 'PUBLICATION_PAUSED=YES'
 
       - name: Build Windows installer and portable archive
@@ -72,7 +107,7 @@ jobs:
           Write-Host 'INSTALLER_BUILD_QA=PASS'
           Write-Host 'PORTABLE_BUILD_QA=PASS'
 
-      - name: Prepare immutable release assets
+      - name: Prepare build evidence assets
         if: steps.plan.outputs.build == 'true'
         shell: pwsh
         run: |
@@ -160,22 +195,25 @@ jobs:
           [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes, [System.Text.UTF8Encoding]::new($false))
           Write-Host 'RELEASE_NOTES_RENDER_QA=PASS'
 
-      - name: Upload build evidence artifact
+      - name: Upload governed build evidence artifact
         if: steps.plan.outputs.build == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: bridgex-release-${{ inputs.source_sha }}
+          name: ${{ steps.plan.outputs.artifact_name }}
           path: |
             release-assets/*
             release-notes.md
           if-no-files-found: error
-          retention-days: 30
+          retention-days: ${{ steps.plan.outputs.retention_days }}
 
       - name: Dry-run result
         if: steps.plan.outputs.build == 'true'
         shell: pwsh
         run: |
           Write-Host 'WINDOWS_RELEASE_DRY_RUN=PASS'
+          Write-Host "BRIDGEX_ARTIFACT_CLASS=${{ steps.plan.outputs.artifact_class }}"
+          Write-Host "BRIDGEX_ARTIFACT_RETENTION_DAYS=${{ steps.plan.outputs.retention_days }}"
+          Write-Host "BRIDGEX_PROMOTION_AUTHORITY=${{ steps.plan.outputs.promotion_authority }}"
           Write-Host 'GITHUB_RELEASE_PUBLISHED=NOT_RUN_SECURITY_GATE'
           Write-Host 'PUBLICATION_PAUSED=YES'
           Write-Host 'VIRUSTOTAL_EXACT_ARTIFACT_GATE=PENDING'

@@ -1043,8 +1043,7 @@ jobs:
               }
             }
             $main = $windows | Where-Object {
-              $_.Title -match '(?i)TNSuite BridgeX' -and
-              $_.Title -notmatch '(?i)Warning|Error|Setup'
+              $_.Title -match '(?i)^TNSuite BridgeX$'
             } | Select-Object -First 1
           } while ($null -eq $main -and (Get-Date) -lt $deadline)
 

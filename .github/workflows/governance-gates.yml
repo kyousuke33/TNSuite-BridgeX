@@ -8,10 +8,13 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   governance:
     runs-on: ubuntu-latest
+    outputs:
+      windows_build_required: ${{ steps.build-impact.outputs.windows_build_required }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,12 +64,52 @@ jobs:
           test -f skills/project-audit/SKILL.md
           echo GOVERNANCE_STRUCTURE_QA=PASS
 
+      - name: Determine Windows build impact
+        id: build-impact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('windows_build_required', 'true');
+              core.info('WINDOWS_BUILD_IMPACT=REQUIRED reason=CANONICAL_MAIN_PUSH');
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+
+            const noBuildExact = new Set([
+              'AGENTS.md',
+              'README.md',
+              'CONTRIBUTING.md',
+              'CHANGELOG.md',
+              'COPYING',
+            ]);
+            const isDocsOrGovernanceOnly = (path) =>
+              path.startsWith('docs/') || noBuildExact.has(path);
+
+            const changed = files.map((file) => file.filename);
+            const buildImpacting = changed.filter((path) => !isDocsOrGovernanceOnly(path));
+            const required = buildImpacting.length > 0;
+
+            core.setOutput('windows_build_required', required ? 'true' : 'false');
+            core.info(`WINDOWS_BUILD_IMPACT=${required ? 'REQUIRED' : 'NOT_REQUIRED'}`);
+            core.info(`WINDOWS_BUILD_CHANGED_FILE_COUNT=${changed.length}`);
+            core.info(`WINDOWS_BUILD_IMPACTING_FILE_COUNT=${buildImpacting.length}`);
+            if (!required) {
+              core.info('DOCS_GOVERNANCE_ONLY_BINARY_GENERATION=SKIPPED');
+            }
+
       - name: Source gate
         run: bash .release/source-gates.sh
 
   windows-build-qa:
     name: Windows build QA (dry run)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.governance.outputs.windows_build_required == 'true'
     needs: governance
     permissions:
       contents: read
@@ -74,6 +117,7 @@ jobs:
     with:
       source_sha: ${{ github.sha }}
       publish_release: false
+      artifact_class: PR_TEST_EVIDENCE
 
   withdraw-hotfix16-release:
     name: Withdraw flagged Hotfix16 release
@@ -107,6 +151,7 @@ jobs:
     with:
       source_sha: ${{ github.sha }}
       publish_release: false
+      artifact_class: IMMUTABLE_RELEASE_CANDIDATE
 
   report-main-artifact:
     name: Report canonical main artifact
@@ -133,11 +178,13 @@ jobs:
           CANONICAL_MAIN_BUILD_RUN_ID=${GITHUB_RUN_ID}
           CANONICAL_MAIN_BUILD_RUN_URL=${run_url}
           CANONICAL_MAIN_ARTIFACT=${artifact_name}
+          ARTIFACT_CLASS=IMMUTABLE_RELEASE_CANDIDATE
+          ARTIFACT_RETENTION_DAYS=30
           WINDOWS_MAIN_BUILD_QA=PASS
           PUBLICATION_PAUSED=YES
           \`\`\`
 
-          The artifact above is the only Build12-Hotfix17 candidate eligible for SHA-256 / VirusTotal verification and later governed promotion. PR dry-run artifacts are not promotion authority.
+          The artifact above is the only Build12-Hotfix17 candidate eligible for SHA-256 / VirusTotal verification and later governed promotion. PR dry-run artifacts use the separate `bridgex-pr-test-<sha>` family, expire after 2 days, and are not promotion authority.
           EOF
           gh issue comment 18 --repo "$GITHUB_REPOSITORY" --body-file /tmp/bridgex-main-artifact.md
           echo "CANONICAL_MAIN_ARTIFACT_REPORTED=${artifact_name}"
