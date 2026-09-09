@@ -1,12 +1,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PortableZip,
-    [Parameter(Mandatory = $true)][string]$OutputDirectory
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [Parameter(Mandatory = $true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$ExpectedBridgeXSha256
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$ExpectedBridgeXSha256 = $ExpectedBridgeXSha256.ToLowerInvariant()
 
 $hotfix21 = Join-Path $PSScriptRoot 'build-wix-installer-hotfix21.ps1'
 if (-not (Test-Path -LiteralPath $hotfix21)) { throw "HOTFIX23_BASE_MISSING=$hotfix21" }
@@ -121,7 +123,7 @@ $source = $source.Replace($anchor, $injection + "`r`n`r`n" + $anchor)
 $tempWrapper = Join-Path $PSScriptRoot ".BridgeX-Hotfix23-Wrapper-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.ps1"
 try {
     [System.IO.File]::WriteAllText($tempWrapper, $source, [System.Text.UTF8Encoding]::new($false))
-    & pwsh.exe -NoLogo -NoProfile -File $tempWrapper -PortableZip $PortableZip -OutputDirectory $OutputDirectory
+    & pwsh.exe -NoLogo -NoProfile -File $tempWrapper -PortableZip $PortableZip -OutputDirectory $OutputDirectory -ExpectedBridgeXSha256 $ExpectedBridgeXSha256
     if ($LASTEXITCODE -ne 0) { throw "HOTFIX23_WIX_BUILD_FAILED=$LASTEXITCODE" }
 }
 finally {

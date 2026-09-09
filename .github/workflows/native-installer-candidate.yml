@@ -16,7 +16,6 @@ jobs:
       CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
       CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
-      EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
     steps:
       - name: Checkout exact PR source
@@ -54,6 +53,21 @@ jobs:
 
           $portable = Join-Path $artifactDir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
+          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
+          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          try {
+            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
+            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
+            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
+            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
+            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
+            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
+            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
+          }
+          finally {
+            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
           Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
           Write-Host "WIX_INSTALLER_RUNTIME_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
@@ -81,7 +95,8 @@ jobs:
 
           & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix21.ps1 `
             -PortableZip $portable `
-            -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
+            -OutputDirectory (Join-Path $PWD 'dist') `
+            -ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "WIX_INSTALLER_BUILD_FAILED=$LASTEXITCODE" }
 
           $msi = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX.msi'
@@ -288,7 +303,6 @@ jobs:
       CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
       CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
-      EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
     steps:
       - name: Checkout PR source
@@ -326,6 +340,21 @@ jobs:
           Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
           $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
+          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
+          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          try {
+            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
+            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
+            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
+            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
+            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
+            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
+            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
+          }
+          finally {
+            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
           Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
 
@@ -348,7 +377,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix22-WiX-QA.txt'
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix22.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix22.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist') -ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "HOTFIX22_BUILD_FAILED=$LASTEXITCODE" }
 
           $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix22-WiX-Setup.exe'
@@ -448,7 +477,6 @@ jobs:
       CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
       CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
-      EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
     steps:
       - name: Checkout PR source
@@ -486,6 +514,21 @@ jobs:
           Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
           $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
+          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
+          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          try {
+            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
+            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
+            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
+            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
+            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
+            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
+            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
+          }
+          finally {
+            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
+          }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist'), (Join-Path $PWD 'dist-prev') | Out-Null
           Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
           Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
@@ -507,7 +550,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix22.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist-prev')
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix22.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist-prev') -ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256
           if ($LASTEXITCODE -ne 0) { throw "HOTFIX22_BASELINE_BUILD_FAILED=$LASTEXITCODE" }
           $setup = Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix22-WiX-Setup.exe'
           if (-not (Test-Path -LiteralPath $setup)) { throw 'HOTFIX22_BASELINE_SETUP_MISSING' }
@@ -518,7 +561,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           $qa = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix23-WiX-QA.txt'
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix23.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist') 2>&1 | Tee-Object -FilePath $qa
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix23.ps1 -PortableZip $portable -OutputDirectory (Join-Path $PWD 'dist') -ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256 2>&1 | Tee-Object -FilePath $qa
           if ($LASTEXITCODE -ne 0) { throw "HOTFIX23_BUILD_FAILED=$LASTEXITCODE" }
 
           $setup = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix23-WiX-Setup.exe'

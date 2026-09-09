@@ -83,7 +83,7 @@ Write-Host "HOTFIX24_EXPECTED_RUNTIME_SHA256=$ExpectedBridgeXSha256"
 $temp = Join-Path $PSScriptRoot ".BridgeX-Hotfix24-Driver-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.ps1"
 try {
     [System.IO.File]::WriteAllText($temp, $script, [System.Text.UTF8Encoding]::new($false))
-    & pwsh.exe -NoLogo -NoProfile -File $temp -PortableZip $PortableZip -OutputDirectory $OutputDirectory
+    & pwsh.exe -NoLogo -NoProfile -File $temp -PortableZip $PortableZip -OutputDirectory $OutputDirectory -ExpectedBridgeXSha256 $ExpectedBridgeXSha256
     if ($LASTEXITCODE -ne 0) { throw "HOTFIX24_WIX_BUILD_FAILED=$LASTEXITCODE" }
 }
 finally {

@@ -85,4 +85,32 @@ fi
 }
 echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=PASS'
 
+[[ "$(grep -Fc 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=ARTIFACT_DERIVATION_COUNT' >&2
+  exit 44
+}
+[[ "$(grep -Fc '"EXPECTED_BRIDGEX_SHA256=$runtimeSha"' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=GITHUB_ENV_BINDING_COUNT' >&2
+  exit 44
+}
+[[ "$(grep -Fc -- '-ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256' "$artifact_workflow")" -eq 4 ]] || {
+  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=LEGACY_BUILDER_PROPAGATION_COUNT' >&2
+  exit 44
+}
+if grep -Fq 'EXPECTED_BRIDGEX_SHA256: '''9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'''' "$artifact_workflow"; then
+  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=HISTORICAL_RUNTIME_HASH_PIN_IN_WORKFLOW' >&2
+  exit 44
+fi
+for builder in   .release/build-wix-installer-hotfix21.ps1   .release/build-wix-installer-hotfix22.ps1   .release/build-wix-installer-hotfix23.ps1; do
+  grep -Fq 'ExpectedBridgeXSha256' "$builder" || {
+    echo "PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=BUILDER_PARAMETER_MISSING file=$builder" >&2
+    exit 44
+  }
+done
+grep -Fq -- '-ExpectedBridgeXSha256 $ExpectedBridgeXSha256' .release/build-wix-installer-hotfix24.ps1 || {
+  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=HOTFIX24_PROPAGATION_MISSING' >&2
+  exit 44
+}
+echo 'PR_CANONICAL_RUNTIME_HASH_QA=PASS'
+
 echo 'SOURCE_REGRESSION_QA=PASS'

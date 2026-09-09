@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PortableZip,
-    [Parameter(Mandatory = $true)][string]$OutputDirectory
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [Parameter(Mandatory = $true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$ExpectedBridgeXSha256
 )
 
 Set-StrictMode -Version Latest
@@ -19,6 +20,12 @@ $themeXmlLiteral = [System.Security.SecurityElement]::Escape((Resolve-Path -Lite
 $localizationXmlLiteral = [System.Security.SecurityElement]::Escape((Resolve-Path -LiteralPath $localizationPath).Path)
 
 $text = Get-Content -LiteralPath $basePath -Raw -Encoding UTF8
+$ExpectedBridgeXSha256 = $ExpectedBridgeXSha256.ToLowerInvariant()
+$hashNeedle = "`$ExpectedBridgeXHash = '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'"
+$hashReplacement = "`$ExpectedBridgeXHash = '$ExpectedBridgeXSha256'"
+if (-not $text.Contains($hashNeedle)) { throw 'HOTFIX21_RUNTIME_HASH_AUTHORITY_ANCHOR_MISSING' }
+$text = $text.Replace($hashNeedle, $hashReplacement)
+Write-Host "HOTFIX21_EXPECTED_RUNTIME_SHA256=$ExpectedBridgeXSha256"
 $text = $text.Replace("TNSuiteBridgeX_260820_v0.5-Build12-Hotfix18-WiX", "TNSuiteBridgeX_260820_v0.5-Build12-Hotfix21-WiX")
 $text = $text.Replace("`$MsiVersion = '0.5.1218'", "`$MsiVersion = '0.5.1221'")
 $text = $text.Replace("`$BundleVersion = '0.5.12.18'", "`$BundleVersion = '0.5.12.21'")
