@@ -1,0 +1,31 @@
+{
+  "authority_evidence": [
+    {
+      "contains": "ROADMAP_COMPLETE=false",
+      "path": "docs/90_GOVERNANCE/CURRENT_STATE.md"
+    },
+    {
+      "contains": "## P0 — Secure desktop baseline and Build12 release closure",
+      "path": "docs/00_PRODUCT/ROADMAP.md"
+    },
+    {
+      "contains": "### P0.D — Product identity and Windows integration",
+      "path": "docs/00_PRODUCT/ROADMAP.md"
+    }
+  ],
+  "blockers": [],
+  "current_work": {
+    "id": "roadmap:P0",
+    "state": "ACTIVE",
+    "summary": "Complete Build12 governed release closure from the merged installer baseline"
+  },
+  "declared_status": "REPORTED",
+  "milestone": {
+    "id": "P0",
+    "target_release": "Build12",
+    "title": "Secure desktop baseline and Build12 release closure"
+  },
+  "project_key": "bridgex",
+  "repository": "kyousuke33/TNSuite-BridgeX",
+  "schema": "tnsuite.project-status-producer-config.v1"
+}
