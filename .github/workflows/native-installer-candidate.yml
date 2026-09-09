@@ -256,7 +256,7 @@ jobs:
           $portable = Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           $legacyDist = Join-Path $env:RUNNER_TEMP 'bridgex-hotfix20-legacy'
           New-Item -ItemType Directory -Force -Path $legacyDist | Out-Null
-          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix20.ps1 -PortableZip $portable -OutputDirectory $legacyDist | Out-Host
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix20.ps1 -PortableZip $portable -OutputDirectory $legacyDist -ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256 | Out-Host
           if ($LASTEXITCODE -ne 0) { throw 'LEGACY_HOTFIX20_BUILD=FAIL' }
 
           $oldSetup = Join-Path $legacyDist 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix20-WiX-Setup.exe'
