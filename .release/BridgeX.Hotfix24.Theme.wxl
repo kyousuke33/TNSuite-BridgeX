@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-us" Language="1033" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption" Value="[WixBundleName] Setup" />
+  <String Id="Title" Value="TNSuite BridgeX" />
+  <String Id="CheckingForUpdatesLabel" Value="Checking installed version" />
+  <String Id="InstallHeader" Value="Welcome to TNSuite BridgeX Setup" />
+  <String Id="UpdateHeader" Value="Update TNSuite BridgeX" />
+  <String Id="InstallMessage" Value="Setup will install TNSuite BridgeX on your computer. Click Install to continue or Cancel to exit." />
+  <String Id="InstallMessageOptions" Value="Setup is ready to install TNSuite BridgeX. Use Options to choose the drive or parent folder and whether to create a Desktop shortcut." />
+  <String Id="UpdateMessage" Value="TNSuite BridgeX version [DetectedBridgeXMsiVersion] is already installed. Click Update to install version [TargetBridgeXMsiVersion]. The existing installation location will be preserved and running BridgeX processes will be closed automatically." />
+  <String Id="InstallVersion" Value="Setup version [WixBundleVersion]" />
+  <String Id="InstallUpdateButton" Value="&amp;Update" />
+  <String Id="ConfirmCancelMessage" Value="Are you sure you want to cancel?" />
+  <String Id="ExecuteUpgradeRelatedBundleMessage" Value="Previous version" />
+  <String Id="HelpHeader" Value="Setup Help" />
+  <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [directory] - installs, repairs, uninstalls or creates a local bundle copy.&#xA;&#xA;/passive | /quiet - minimal or no UI.&#xA;/norestart - suppress restart prompts.&#xA;/log log.txt - writes setup logs." />
+  <String Id="HelpCloseButton" Value="&amp;Close" />
+  <String Id="InstallLicenseLinkText" Value="[WixBundleName] &lt;a href=&quot;#&quot;&gt;license terms&lt;/a&gt;." />
+  <String Id="InstallAcceptCheckbox" Value="I &amp;agree to the license terms and conditions" />
+  <String Id="InstallOptionsButton" Value="&amp;Options" />
+  <String Id="InstallInstallButton" Value="&amp;Install" />
+  <String Id="InstallCancelButton" Value="&amp;Cancel" />
+  <String Id="OptionsHeader" Value="Choose Install Location" />
+  <String Id="OptionsLocationLabel" Value="Drive or parent folder:" />
+  <String Id="OptionsAutoSubfolderHint" Value="Setup automatically creates TNSuite\BridgeX below the selected location. Example: D:\ becomes D:\TNSuite\BridgeX." />
+  <String Id="OptionsDesktopShortcutCheckbox" Value="Create a Desktop shortcut" />
+  <String Id="OptionsBrowseButton" Value="&amp;Browse" />
+  <String Id="OptionsOkButton" Value="&amp;OK" />
+  <String Id="OptionsCancelButton" Value="&amp;Cancel" />
+  <String Id="ProgressHeader" Value="Installing TNSuite BridgeX" />
+  <String Id="ProgressLabel" Value="Processing:" />
+  <String Id="OverallProgressPackageText" Value="Initializing..." />
+  <String Id="ProgressCancelButton" Value="&amp;Cancel" />
+  <String Id="ModifyHeader" Value="TNSuite BridgeX is already installed" />
+  <String Id="ModifyMessage" Value="Choose Repair to restore the current installation, or Uninstall to remove TNSuite BridgeX. Running BridgeX processes are closed automatically before maintenance starts." />
+  <String Id="ModifyRepairButton" Value="&amp;Repair" />
+  <String Id="ModifyUninstallButton" Value="&amp;Uninstall" />
+  <String Id="ModifyCancelButton" Value="&amp;Cancel" />
+  <String Id="SuccessHeader" Value="TNSuite BridgeX is ready" />
+  <String Id="SuccessMessage" Value="Setup has completed successfully." />
+  <String Id="SuccessCacheHeader" Value="Cache Successfully Completed" />
+  <String Id="SuccessInstallHeader" Value="TNSuite BridgeX is ready" />
+  <String Id="SuccessLayoutHeader" Value="Layout Successfully Completed" />
+  <String Id="SuccessModifyHeader" Value="Modify Successfully Completed" />
+  <String Id="SuccessRepairHeader" Value="Repair Successfully Completed" />
+  <String Id="SuccessUninstallHeader" Value="TNSuite BridgeX was removed" />
+  <String Id="SuccessUnsafeUninstallHeader" Value="TNSuite BridgeX was removed" />
+  <String Id="SuccessLaunchCheckbox" Value="Launch TNSuite BridgeX" />
+  <String Id="SuccessFinishLaunchButton" Value="&amp;Finish" />
+  <String Id="SuccessFinishButton" Value="&amp;Finish" />
+  <String Id="SuccessLaunchButton" Value="&amp;Launch" />
+  <String Id="SuccessRestartText" Value="A Windows restart is required to complete setup." />
+  <String Id="SuccessUninstallRestartText" Value="A Windows restart is required to complete removal." />
+  <String Id="SuccessRestartButton" Value="&amp;Restart" />
+  <String Id="SuccessCloseButton" Value="&amp;Close" />
+  <String Id="FailureHeader" Value="Setup Failed" />
+  <String Id="FailureCacheHeader" Value="Cache Failed" />
+  <String Id="FailureInstallHeader" Value="Setup Failed" />
+  <String Id="FailureLayoutHeader" Value="Layout Failed" />
+  <String Id="FailureModifyHeader" Value="Modify Failed" />
+  <String Id="FailureRepairHeader" Value="Repair Failed" />
+  <String Id="FailureUninstallHeader" Value="Uninstall Failed" />
+  <String Id="FailureUnsafeUninstallHeader" Value="Uninstall Failed" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused setup to fail. Please fix the issues and retry setup. For more information see the &lt;a href=&quot;#&quot;&gt;log file&lt;/a&gt;." />
+  <String Id="FailureRestartText" Value="A Windows restart is required to complete rollback." />
+  <String Id="FailureRestartButton" Value="&amp;Restart" />
+  <String Id="FailureCloseButton" Value="&amp;Close" />
+</WixLocalization>
