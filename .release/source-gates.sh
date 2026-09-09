@@ -66,4 +66,23 @@ python3 qa/locale_helper_check.py
 python3 qa/fresh_env_dependency_check.py scripts/build-filezilla-dark.sh
 python3 qa/contrast_check.py
 
+artifact_workflow='.github/workflows/native-installer-candidate.yml'
+if grep -Fq 'CANONICAL_ARTIFACT_ID:' "$artifact_workflow"; then
+  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=HARD_CODED_ACTIONS_ARTIFACT_ID' >&2
+  exit 43
+fi
+[[ "$(grep -Fc 'CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=PR_BASE_SHA_BINDING_COUNT' >&2
+  exit 43
+}
+[[ "$(grep -Fc 'CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=GOVERNED_ARTIFACT_NAME_BINDING_COUNT' >&2
+  exit 43
+}
+[[ "$(grep -Fc 'CANONICAL_ARTIFACT_RESOLUTION_FAIL' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=FAIL_CLOSED_RESOLUTION_COUNT' >&2
+  exit 43
+}
+echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=PASS'
+
 echo 'SOURCE_REGRESSION_QA=PASS'

@@ -13,8 +13,8 @@ jobs:
   wix-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_ARTIFACT_ID: '9405996175'
-      CANONICAL_SOURCE_SHA: '5c9d70673d9b5da4a4878c9ce548077f0ef67539'
+      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
+      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
       EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
@@ -35,9 +35,22 @@ jobs:
             Accept = 'application/vnd.github+json'
             'X-GitHub-Api-Version' = '2022-11-28'
           }
-          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:CANONICAL_ARTIFACT_ID/zip"
-          Invoke-WebRequest -Headers $headers -Uri $uri -OutFile $artifactZip -MaximumRedirection 8
+          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
+          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
+          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
+          $matches = @($listing.artifacts | Where-Object {
+            -not $_.expired -and
+            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
+            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
+          })
+          if ($matches.Count -ne 1) {
+            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
+          }
+          $artifact = $matches[0]
+          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $artifactZip -MaximumRedirection 8
           Expand-Archive -LiteralPath $artifactZip -DestinationPath $artifactDir -Force
+          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
+          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
 
           $portable = Join-Path $artifactDir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
@@ -272,7 +285,8 @@ jobs:
   hotfix22-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_ARTIFACT_ID: '9405996175'
+      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
+      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
       EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
@@ -293,8 +307,23 @@ jobs:
             Accept = 'application/vnd.github+json'
             'X-GitHub-Api-Version' = '2022-11-28'
           }
-          Invoke-WebRequest -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:CANONICAL_ARTIFACT_ID/zip" -OutFile $zip -MaximumRedirection 8
+          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
+          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
+          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
+          $matches = @($listing.artifacts | Where-Object {
+            -not $_.expired -and
+            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
+            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
+          })
+          if ($matches.Count -ne 1) {
+            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
+          }
+          $artifact = $matches[0]
+          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip -MaximumRedirection 8
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
+          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
+          Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
           $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
@@ -416,7 +445,8 @@ jobs:
   hotfix23-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_ARTIFACT_ID: '9405996175'
+      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
+      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
       EXPECTED_BRIDGEX_SHA256: '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 
@@ -437,8 +467,23 @@ jobs:
             Accept = 'application/vnd.github+json'
             'X-GitHub-Api-Version' = '2022-11-28'
           }
-          Invoke-WebRequest -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$env:CANONICAL_ARTIFACT_ID/zip" -OutFile $zip -MaximumRedirection 8
+          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
+          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
+          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
+          $matches = @($listing.artifacts | Where-Object {
+            -not $_.expired -and
+            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
+            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
+          })
+          if ($matches.Count -ne 1) {
+            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
+          }
+          $artifact = $matches[0]
+          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip -MaximumRedirection 8
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
+          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
+          Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
           $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
           if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
           New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist'), (Join-Path $PWD 'dist-prev') | Out-Null
