@@ -45,9 +45,9 @@ Required outcomes retained from the accepted baseline:
 
 ### P0.C — Reproducible Windows build and installer lifecycle remediation
 
-**Status:** EVIDENCED IN ACTIVE IMPLEMENTATION PR; NOT ACCEPTED ON `main` UNTIL MERGED.
+**Status:** DONE on `main`.
 
-Implementation workstream: PR #28 (`fix/native-installer-av-20260820`).
+Accepted implementation: PR #28, exact green head `ee8f3f94a9abfbf4f61f432494a8f9c1ab5672d9`, merged as `07495406171091767cd4a6be3c22e17e7b7918b9`.
 
 Required outcomes:
 - full Windows runtime is rebuilt from canonical source rather than relying on an opaque prior EXE;
@@ -57,13 +57,13 @@ Required outcomes:
 - normal BridgeX-owned file locks do not create Files In Use/reboot UX;
 - no custom SFX, packer/obfuscation or installer-side PowerShell runtime is introduced.
 
-Historical active-PR evidence may be recorded in `CURRENT_STATE.md`, but it does not become canonical-main acceptance merely by existing in a PR.
+Historical active-PR evidence becomes canonical-main acceptance only after the exact reviewed source is safely merged. `CURRENT_STATE.md` records the exact head/merge/tree/run binding used for that acceptance.
 
 ### P0.D — Product identity and Windows integration
 
-**Status:** ACTIVE.
+**Status:** DONE on `main`.
 
-**Active milestone:** `Build12-Hotfix24`.
+Accepted milestone: `Build12-Hotfix25`, preserving the Hotfix24 identity/maintenance acceptance while closing the startup-warning regression.
 
 Objective: restore coherent BridgeX product identity after the installer architecture remediation without regressing the accepted maintenance behavior.
 
@@ -81,7 +81,7 @@ Acceptance criteria:
 
 ### P0.E — Build12 Release Candidate lock
 
-**Status:** BLOCKED BY P0.D.
+**Status:** ACTIVE.
 
 Objective: stop the indefinite Hotfix loop and bind one candidate to an exact evidence chain.
 

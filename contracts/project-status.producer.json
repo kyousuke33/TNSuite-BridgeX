@@ -1,0 +1,35 @@
+{
+  "authority_evidence": [
+    {
+      "contains": "ACTIVE_PHASE=P0",
+      "path": "docs/90_GOVERNANCE/CURRENT_STATE.md"
+    },
+    {
+      "contains": "ACTIVE_WORKSTREAM=P0.E_BUILD12_RELEASE_CANDIDATE_LOCK",
+      "path": "docs/90_GOVERNANCE/CURRENT_STATE.md"
+    },
+    {
+      "contains": "ROADMAP_COMPLETE=false",
+      "path": "docs/90_GOVERNANCE/CURRENT_STATE.md"
+    },
+    {
+      "contains": "### P0.E — Build12 Release Candidate lock",
+      "path": "docs/00_PRODUCT/ROADMAP.md"
+    }
+  ],
+  "blockers": [],
+  "current_work": {
+    "id": "roadmap:P0.E",
+    "state": "ACTIVE",
+    "summary": "Lock one exact Build12 Release Candidate source/artifact evidence chain"
+  },
+  "declared_status": "REPORTED",
+  "milestone": {
+    "id": "P0.E",
+    "target_release": "Build12",
+    "title": "Build12 Release Candidate lock"
+  },
+  "project_key": "bridgex",
+  "repository": "kyousuke33/TNSuite-BridgeX",
+  "schema": "tnsuite.project-status-producer-config.v1"
+}

@@ -55,3 +55,6 @@ secrets/
 Thumbs.db
 __pycache__/
 *.py[cod]
+
+# Generated exact-source Project Status payload (never commit self-referential SHA).
+.project-status/status.json

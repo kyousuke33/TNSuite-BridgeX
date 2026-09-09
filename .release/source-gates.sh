@@ -124,4 +124,6 @@ fi
 echo 'PR_LEGACY_HOTFIX20_RUNTIME_HASH_QA=PASS'
 echo 'PR_HOTFIX24_RUNTIME_HASH_QA=PASS'
 
+python3 tools/ci/project_status_source_check.py
+
 echo 'SOURCE_REGRESSION_QA=PASS'

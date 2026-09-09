@@ -1,0 +1,12 @@
+{
+  "compatibility": ">=1.0.0,<2.0.0",
+  "contract_id": "tnsuite.project-status.v1",
+  "contract_ref": "b12c68c43c8f3a4883da295b189173d562b981fa",
+  "contract_source": "kyousuke33/TNSuite-Platform-Contracts",
+  "contract_version": "1.0.1",
+  "deephealth_repin_required": false,
+  "family_pin_model": "affected-scope-exact-git-sha",
+  "generated_payload_path": ".project-status/status.json",
+  "portal_sso_repin_required": false,
+  "schema": "tnsuite.project-status-family-pin.v1"
+}
