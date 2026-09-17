@@ -207,3 +207,16 @@ Central managed execution rules:
 32. Platform Contract incompatibility blocks only scopes that consume the incompatible contract. A project may pin a compatible immutable contract version/SHA and continue independent engineering work.
 33. Never claim SOURCE_PASS, ARTIFACT_READY, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority. Historical STAGING_PASS evidence remains historical and is not an active release prerequisite.
 <!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
+
+<!-- TNSUITE_REMOTE_DESKTOP_PROTOCOL_V1:BEGIN -->
+## Remote Desktop Commander execution protocol
+This execution protocol is additive. It does not override project scope, security, release, database, rollback, or Production authority.
+
+- When more than one Remote Desktop Commander device is online, resolve the intended project device once and pass its explicit `deviceId` on every related call. Never rely on the first available online device.
+- Reuse the pinned `deviceId` for the full workstream unless current device evidence proves the target changed.
+- For long-running build, test, scan, migration, deploy, game/UAT, or similar commands, use `start_process` with a short bounded wait to obtain a PID, then use `read_process_output` incrementally. Do not hold one synchronous tool call open for the full operation.
+- After a tool timeout, inspect the existing PID/session/output before retrying. Do not start duplicate build/deploy/migration/UAT processes merely because the previous tool call timed out.
+- Minimize repeated `list_devices`, broad filesystem scans, and tight polling. Prefer targeted paths, bounded output reads, and only the polling needed to establish state transitions.
+- When Remote MCP quota is low or reports `0%`, distinguish quota state from an explicit quota rejection, device ambiguity, tool execution timeout, process failure, or runtime failure. A displayed `0%` alone is not proof of a hard block.
+- Report Remote Desktop failures using direct evidence from device status, tool result, PID/session state, or quota rejection; do not infer root cause from timeout symptoms alone.
+<!-- TNSUITE_REMOTE_DESKTOP_PROTOCOL_V1:END -->
