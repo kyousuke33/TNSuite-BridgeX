@@ -207,3 +207,11 @@ Central managed execution rules:
 32. Platform Contract incompatibility blocks only scopes that consume the incompatible contract. A project may pin a compatible immutable contract version/SHA and continue independent engineering work.
 33. Never claim SOURCE_PASS, ARTIFACT_READY, LIVE_PASS, DONE or equivalent without the evidence level required by project and central authority. Historical STAGING_PASS evidence remains historical and is not an active release prerequisite.
 <!-- TNSUITE:RCP-MANAGED-AGENTS:END -->
+
+<!-- TNSUITE_QA_REUSE_V1:BEGIN -->
+## Fleet QA reuse / invalidation
+
+Authority: `kyousuke33/TNSuite-Platform-Contracts@51bf3586d11ce77d120bf2d66a7784a293d39498`, contract `TNSUITE_QA_REUSE_V1`.
+
+Before any QA execution, declare `INVALIDATED_GATE=<gate|NONE>` and `INVALIDATION_REASON=<specific evidence|NONE>`. If there is no valid invalidation, reuse existing PASS/PASS_LOCKED evidence and do not rerun QA. New chat, agent/session change, resume, or timeout are not invalidation reasons. Resume after failure from the failure point; merge-tree equality reuses exact PR-head source QA; Production deploy reopens only affected runtime/integrity gates; full regression requires broad/unknown impact or explicit authority; do not regenerate a verified package when the source tree is unchanged. Record durable PASS/FAIL/BLOCKED and resume checkpoints in the project Issue or PR.
+<!-- TNSUITE_QA_REUSE_V1:END -->
