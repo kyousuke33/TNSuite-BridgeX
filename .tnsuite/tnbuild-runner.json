@@ -12,5 +12,5 @@
   "rcp_required_for_project_delivery":false,
   "self_hosted_github_runner_architecture":"RETIRED_NOT_REUSED",
   "vps_default_build_farm":false,
-  "runner_workspace_binding":{"HOME":"DISCOVER_THEN_PERSIST","OFFICE":"RUNTIME_CONFIG_DISCOVERED_AND_PERSISTED","VPS_FALLBACK":"/var/lib/tnbuild-bridgex"}
+  "runner_workspace_binding":{"HOME": "/mnt/d/Projects","OFFICE":"RUNTIME_CONFIG_DISCOVERED_AND_PERSISTED","VPS_FALLBACK":"/var/lib/tnbuild-bridgex"}
 }
