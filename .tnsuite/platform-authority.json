@@ -1,0 +1,5 @@
+{
+  "schema":"tnsuite.platform-authority-lock.v1",
+  "project":"kyousuke33/TNSuite-BridgeX",
+  "project_delivery":{"authority_repository":"kyousuke33/TNSuite-Platform-Contracts","authority_sha":"601b1437193f96fa75c4f7d7e82f5241dcdcd084","lock_source":"PROJECT_OWNED_SOURCE"}
+}
