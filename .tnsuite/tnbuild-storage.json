@@ -1,0 +1,9 @@
+{
+  "schema":"tnsuite.build-storage-lifecycle-binding.v1",
+  "project":"bridgex",
+  "authority_sha":"601b1437193f96fa75c4f7d7e82f5241dcdcd084",
+  "contract_path":"contracts/project-delivery/tnsuite.build-storage-lifecycle.v1.md",
+  "adoption":"ADOPTED",
+  "storage_namespace":"bridgex",
+  "canonical_vps_build_root":"/var/lib/tnbuild-bridgex"
+}
