@@ -1,0 +1,16 @@
+{
+  "schema":"tnsuite.runner-placement-binding.v1",
+  "project":"bridgex",
+  "authority_sha":"601b1437193f96fa75c4f7d7e82f5241dcdcd084",
+  "contract_path":"contracts/project-delivery/tnsuite.fleet-runner-placement-handoff.v1.md",
+  "placement_order":["HOME","OFFICE","VPS_FALLBACK"],
+  "online_only_is_ready":false,
+  "active_lease_sticky":true,
+  "handoff_ack_before_sender_cleanup":true,
+  "runner_location_change_alone_invalidates_qa":false,
+  "central_scheduler_authority":"NONE",
+  "rcp_required_for_project_delivery":false,
+  "self_hosted_github_runner_architecture":"RETIRED_NOT_REUSED",
+  "vps_default_build_farm":false,
+  "runner_workspace_binding":{"HOME":"DISCOVER_THEN_PERSIST","OFFICE":"RUNTIME_CONFIG_DISCOVERED_AND_PERSISTED","VPS_FALLBACK":"/var/lib/tnbuild-bridgex"}
+}
