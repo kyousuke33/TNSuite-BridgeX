@@ -1,0 +1,12 @@
+{
+  "schema": "tnsuite.qa-reuse-policy.v1",
+  "project": "kyousuke33/TNSuite-BridgeX",
+  "contract_id": "TNSUITE_QA_REUSE_V1",
+  "central_authority_repository": "kyousuke33/TNSuite-Platform-Contracts",
+  "central_authority_sha": "51bf3586d11ce77d120bf2d66a7784a293d39498",
+  "state": "ADOPTED",
+  "invalidation_declaration_required": true,
+  "no_valid_invalidation_action": "REUSE",
+  "unchanged_source_tree_package_regeneration": "PROHIBITED",
+  "durable_checkpoint_required": true
+}
