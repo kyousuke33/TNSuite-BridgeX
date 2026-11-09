@@ -69,40 +69,29 @@ python3 qa/contrast_check.py
 python3 qa/hotfix25_no_reboot_source_check.py
 
 artifact_workflow='.github/workflows/native-installer-candidate.yml'
-if grep -Fq 'CANONICAL_ARTIFACT_ID:' "$artifact_workflow"; then
-  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=HARD_CODED_ACTIONS_ARTIFACT_ID' >&2
+legacy_input='qa/fetch_pinned_rc1_qa_runtime.ps1'
+[[ -f "$legacy_input" ]] || { echo 'LEGACY_QA_PINNED_RUNTIME=FAIL reason=SCRIPT_MISSING' >&2; exit 43; }
+[[ "$(grep -Fc 'fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories' "$artifact_workflow")" -eq 3 ]] || {
+  echo 'LEGACY_QA_PINNED_RUNTIME=FAIL reason=HISTORICAL_QA_CALL_COUNT' >&2
+  exit 43
+}
+if grep -Fq 'CANONICAL_ARTIFACT_RESOLUTION_FAIL' "$artifact_workflow"; then
+  echo 'LEGACY_QA_PINNED_RUNTIME=FAIL reason=EXPIRED_ACTIONS_ARTIFACT_LOOKUP_REMAINED' >&2
   exit 43
 fi
-[[ "$(grep -Fc 'CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}' "$artifact_workflow")" -eq 3 ]] || {
-  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=PR_BASE_SHA_BINDING_COUNT' >&2
-  exit 43
-}
-[[ "$(grep -Fc 'CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}' "$artifact_workflow")" -eq 3 ]] || {
-  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=GOVERNED_ARTIFACT_NAME_BINDING_COUNT' >&2
-  exit 43
-}
-[[ "$(grep -Fc 'CANONICAL_ARTIFACT_RESOLUTION_FAIL' "$artifact_workflow")" -eq 3 ]] || {
-  echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=FAIL_CLOSED_RESOLUTION_COUNT' >&2
-  exit 43
-}
-echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=PASS'
-
-[[ "$(grep -Fc 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT' "$artifact_workflow")" -eq 3 ]] || {
-  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=ARTIFACT_DERIVATION_COUNT' >&2
-  exit 44
-}
-[[ "$(grep -Fc '"EXPECTED_BRIDGEX_SHA256=$runtimeSha"' "$artifact_workflow")" -eq 3 ]] || {
-  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=GITHUB_ENV_BINDING_COUNT' >&2
-  exit 44
-}
+for key in   '1a2a752e21d8e698c0d1fe7839f94bfc2c0012451ba10a4b111d9bb8045d9299'   '5ec55edad4b44dec1e9419776d9b892384c008458fc8f96c3183df8e41e4a640'   'LEGACY_QA_RUNTIME_IS_MAIN_BUILD_AUTHORITY=NO'; do
+  grep -Fq "$key" "$legacy_input" || {
+    echo "LEGACY_QA_PINNED_RUNTIME=FAIL reason=PINNED_EVIDENCE_MISSING key=$key" >&2
+    exit 43
+  }
+done
 [[ "$(grep -Fc -- '-ExpectedBridgeXSha256 $env:EXPECTED_BRIDGEX_SHA256' "$artifact_workflow")" -eq 5 ]] || {
-  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=LEGACY_BUILDER_PROPAGATION_COUNT' >&2
+  echo 'LEGACY_QA_PINNED_RUNTIME=FAIL reason=LEGACY_BUILDER_HASH_PROPAGATION' >&2
   exit 44
 }
-if grep -Fq 'EXPECTED_BRIDGEX_SHA256: '''9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'''' "$artifact_workflow"; then
-  echo 'PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=HISTORICAL_RUNTIME_HASH_PIN_IN_WORKFLOW' >&2
-  exit 44
-fi
+echo 'LEGACY_QA_PINNED_RUNTIME=PASS_SHA256_VALIDATED_RC1_QA_ONLY'
+echo 'LEGACY_QA_EPHEMERAL_ACTIONS_ARTIFACT_DEPENDENCY=NONE'
+
 for builder in   .release/build-wix-installer-hotfix20.ps1   .release/build-wix-installer-hotfix21.ps1   .release/build-wix-installer-hotfix22.ps1   .release/build-wix-installer-hotfix23.ps1; do
   grep -Fq 'ExpectedBridgeXSha256' "$builder" || {
     echo "PR_CANONICAL_RUNTIME_HASH_QA=FAIL reason=BUILDER_PARAMETER_MISSING file=$builder" >&2

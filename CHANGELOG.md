@@ -6,6 +6,8 @@
 - Re-enable standard Windows Installer Restart Manager (`MSIRESTARTMANAGERCONTROL=0`); retain `MSIDISABLERMRESTART=1` to avoid auto-relaunching the application.
 - Exit code `3010` is a QA failure; add Windows scenarios for fresh install over running legacy BridgeX, update, repair and uninstall, rejecting MSI reboot-scheduling evidence.
 - The Hotfix25 installer QA job uses the immutable public RC1 portable ZIP as a SHA-256-pinned **test-only runtime input** to bypass expired Actions artifacts and intermittent MSYS2 downloads; this does NOT prove a fresh exact-main runtime compilation and must never be promoted as the final release artifact.
+- Historical Hotfix21/22/23 installer QA now consumes the same SHA256-verified public RC1 portable input instead of expired GitHub Actions canonical-main artifacts, with explicit `QA_ONLY` provenance and unchanged functional test coverage; these are not source-build evidence.
+- Windows full-build jobs prefetch pinned MSYS2 2026-06-11 installer from the official MSYS2 repository mirror with verification of the existing toolchain SHA256; release adapter and canonical build manifest remain untouched.
 - These changes are source/QA only until tested on exact Windows build bytes. Do not alter public RC1 assets or publish replacement bytes using the RC1 identity.
 - Scope: Build12 installer only; no product runtime, RCP, production, signing, database or Build13 changes.
 

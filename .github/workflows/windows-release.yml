@@ -97,6 +97,13 @@ jobs:
           Write-Host "BRIDGEX_PROMOTION_AUTHORITY=$promotionAuthority"
           Write-Host 'PUBLICATION_PAUSED=YES'
 
+      - name: Fetch exact MSYS2 build bootstrap from official pinned mirror
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\prefetch_pinned_msys2.ps1
+          if ($LASTEXITCODE -ne 0) { throw "PINNED_MSYS2_PREFETCH_FAILED=$LASTEXITCODE" }
+
       - name: Build Windows installer and portable archive
         if: steps.plan.outputs.build == 'true'
         shell: pwsh
