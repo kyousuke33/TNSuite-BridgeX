@@ -981,7 +981,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "HF25_PR_SOURCE_WINDOWS_E2E_FAILED=$LASTEXITCODE" }
           $manifest = Join-Path $PWD 'dist-hf25-source\BridgeX-Hotfix25-PR-Source-HashChain.txt'
           if (-not (Test-Path -LiteralPath $manifest)) { throw 'HF25_PR_SOURCE_HASH_MANIFEST_MISSING' }
-          'WINDOWS_E2E=PASS' | Add-Content -LiteralPath $manifest -Encoding utf8
+          $manifestText = Get-Content -LiteralPath $manifest -Raw -Encoding utf8
+          if ($manifestText.Split('WINDOWS_E2E=NOT_YET_VERIFIED').Count -ne 2) {
+            throw 'HF25_PR_SOURCE_E2E_MANIFEST_STATE_INVALID'
+          }
+          $manifestText = $manifestText.Replace('WINDOWS_E2E=NOT_YET_VERIFIED', 'WINDOWS_E2E=PASS')
+          [IO.File]::WriteAllText($manifest, $manifestText, [Text.UTF8Encoding]::new($false))
           Write-Host 'HF25_PR_SOURCE_TO_WINDOWS_E2E=PASS_QA_ONLY'
 
       - name: Upload source-derived Hotfix25 Windows logs
