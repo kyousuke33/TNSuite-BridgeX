@@ -17,7 +17,7 @@ checks = {
     "windows_all_scenarios": all(x in windows for x in ("Run-Setup 'FRESH_INSTALL'", "Run-Setup 'UPGRADE'", "Run-Setup 'REPAIR'", "Run-Setup 'UNINSTALL'")),
     "windows_no_3010": '$p.ExitCode -ne 0' in windows and "Info 1903.Scheduling reboot operation" in windows,
     "wired_qa": "hotfix25_no_reboot_windows.ps1" in workflow,
-    "legacy_qa_runtime_pin": workflow.count("fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories") == 3
+    "legacy_qa_runtime_pin": workflow.count("fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories") == 3 and "RESTART_MANAGER=DISABLED" not in workflow
        and 'CANONICAL_ARTIFACT_RESOLUTION_FAIL' not in workflow,
     "msys2_official_pinned_mirror": (
         'https://repo.msys2.org/distrib/x86_64/msys2-x86_64-20260611.exe'

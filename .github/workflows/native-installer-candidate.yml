@@ -447,7 +447,7 @@ jobs:
             'EXISTING_INSTALL_PATH_COMPONENT={492A8EAC-6707-51E3-9723-967A6E4A94D9}',
             'PRE_INSTALLVALIDATE_AUTO_CLOSE_BRIDGEX=ENABLED',
             'AUTO_CLOSE_TARGETS=BridgeX.exe,BridgeX-CLI.exe',
-            'RESTART_MANAGER=DISABLED',
+            'RESTART_MANAGER=ENABLED',
             'INSTALL_BASE_MIGRATION=MSI_COMPONENT_DIRECTORY'
           )) {
             if (-not $qaText.Contains($marker)) { throw "HOTFIX23_BUILD_MARKER_MISSING=$marker" }
