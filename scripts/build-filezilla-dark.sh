@@ -248,9 +248,10 @@ grep -q '^PATCH_FIXTURE_QA=PASS$' "$WORK/patch-fixture-report.txt"
 
 log "Verify wxWidgets 3.3"
 WXVER="$(/ucrt64/bin/wx-config-3.3 --version)"
+# Rolling MSYS2 patches must be explicitly reviewed; compile QA is not GUI UAT.
 case "$WXVER" in
-  3.3.*) ;;
-  *) echo "ERROR: Expected wxWidgets 3.3.x, got $WXVER" >&2; exit 12 ;;
+  3.3.3|3.3.4) ;;
+  *) echo "ERROR: Unreviewed wxWidgets version $WXVER" >&2; exit 12 ;;
 esac
 echo "WX_VERSION=$WXVER"
 
@@ -782,14 +783,9 @@ python "$QA/production_payload_check.py" "$APP" | tee "$WORK/production-payload-
 grep -q '^PRODUCTION_PAYLOAD_QA=PASS$' "$WORK/production-payload-report.txt"
 
 log "Static binary QA"
-# The bundle must contain wxWidgets 3.3 runtime and must not contain wx 3.2 runtime.
-find "$APP/bin" -maxdepth 1 -type f -iname 'wx*333*.dll' | grep -q . || {
-  echo "ERROR: wxWidgets 3.3 runtime DLLs not found in bundle." >&2; exit 15;
-}
-if find "$APP/bin" -maxdepth 1 -type f -iname 'wx*32*.dll' | grep -q .; then
-  echo "ERROR: wxWidgets 3.2 runtime leaked into bundle." >&2
-  exit 16
-fi
+# Validate packaged wxWidgets DLLs against the actual compiled wx-config ABI,
+# not the historical 333 suffix. Reject mixed or unreviewed patch-level DLLs.
+python "$QA/wx_runtime_abi_check.py" "$WXVER" "$APP/bin"
 
 # FileZilla is a GUI application. Build07 accidentally produced a console-subsystem
 # executable, causing a CMD window to appear beside the dark GUI. Fail closed unless

@@ -66,6 +66,7 @@ python3 qa/locale_helper_check.py
 python3 qa/fresh_env_dependency_check.py scripts/build-filezilla-dark.sh
 python3 qa/contrast_check.py
 
+python3 qa/wx_runtime_abi_check.py --self-test
 python3 qa/hotfix25_no_reboot_source_check.py
 
 artifact_workflow='.github/workflows/native-installer-candidate.yml'
