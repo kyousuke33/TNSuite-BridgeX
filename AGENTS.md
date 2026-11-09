@@ -215,3 +215,16 @@ Authority: `kyousuke33/TNSuite-Platform-Contracts@51bf3586d11ce77d120bf2d66a7784
 
 Before any QA execution, declare `INVALIDATED_GATE=<gate|NONE>` and `INVALIDATION_REASON=<specific evidence|NONE>`. If there is no valid invalidation, reuse existing PASS/PASS_LOCKED evidence and do not rerun QA. New chat, agent/session change, resume, or timeout are not invalidation reasons. Resume after failure from the failure point; merge-tree equality reuses exact PR-head source QA; Production deploy reopens only affected runtime/integrity gates; full regression requires broad/unknown impact or explicit authority; do not regenerate a verified package when the source tree is unchanged. Record durable PASS/FAIL/BLOCKED and resume checkpoints in the project Issue or PR.
 <!-- TNSUITE_QA_REUSE_V1:END -->
+
+<!-- TNSUITE_REMOTE_DESKTOP_PROTOCOL_V1:BEGIN -->
+## Remote Desktop Commander execution protocol
+This execution protocol is additive. It does not override project scope, security, release, database, rollback, or Production authority.
+
+- When more than one Remote Desktop Commander device is online, resolve the intended project device once and pass its explicit `deviceId` on every related call. Never rely on the first available online device.
+- Reuse the pinned `deviceId` for the full workstream unless current device evidence proves the target changed.
+- For long-running build, test, scan, migration, deploy, game/UAT, or similar commands, use `start_process` with a short bounded wait to obtain a PID, then use `read_process_output` incrementally. Do not hold one synchronous tool call open for the full operation.
+- After a tool timeout, inspect the existing PID/session/output before retrying. Do not start duplicate build/deploy/migration/UAT processes merely because the previous tool call timed out.
+- Minimize repeated `list_devices`, broad filesystem scans, and tight polling. Prefer targeted paths, bounded output reads, and only the polling needed to establish state transitions.
+- When Remote MCP quota is low or reports `0%`, distinguish quota state from an explicit quota rejection, device ambiguity, tool execution timeout, process failure, or runtime failure. A displayed `0%` alone is not proof of a hard block.
+- Report Remote Desktop failures using direct evidence from device status, tool result, PID/session state, or quota rejection; do not infer root cause from timeout symptoms alone.
+<!-- TNSUITE_REMOTE_DESKTOP_PROTOCOL_V1:END -->
