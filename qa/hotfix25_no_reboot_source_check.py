@@ -17,6 +17,19 @@ checks = {
     "windows_all_scenarios": all(x in windows for x in ("Run-Setup 'FRESH_INSTALL'", "Run-Setup 'UPGRADE'", "Run-Setup 'REPAIR'", "Run-Setup 'UNINSTALL'")),
     "windows_no_3010": '$p.ExitCode -ne 0' in windows and "Info 1903.Scheduling reboot operation" in windows,
     "wired_qa": "hotfix25_no_reboot_windows.ps1" in workflow,
+    "exact_pr_checkout": workflow.count("ref: ${{ github.event.pull_request.head.sha }}") == 5,
+    "source_derived_hf25_chain": all(
+        marker in workflow for marker in (
+            "Build exact PR-source Hotfix25 and record artifact hash chain",
+            "Windows E2E for source-derived Hotfix25",
+            "HF25_PR_SOURCE_TO_WINDOWS_E2E=PASS_QA_ONLY",
+            "PORTABLE_ZIP_SHA256=",
+            "RUNTIME_BRIDGEX_EXE_SHA256=",
+            "MSI_SHA256=",
+            "SETUP_EXE_SHA256=",
+            "RELEASE_PROMOTION_AUTHORITY=NONE",
+        )
+    ),
     "diagnostic_logs_uploaded": "Upload Hotfix25 Windows E2E diagnostics" in workflow
         and "windows-qa-failure-summary.txt" in workflow
         and "Write-FailureEvidence" in windows,

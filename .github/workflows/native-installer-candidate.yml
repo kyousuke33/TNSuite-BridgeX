@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout exact PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
@@ -259,6 +261,8 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
@@ -390,6 +394,8 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
@@ -613,6 +619,8 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Prepare disposable Hotfix24 runtime build hooks
         shell: pwsh
@@ -906,6 +914,101 @@ jobs:
           Write-Host 'HF24_REBOOT_REQUIRED=NO'
           Write-Host 'HF24_EXACT_CANDIDATE_MAINTENANCE_ACCEPTANCE=PASS'
 
+
+      # Source-derived Hotfix25 (PR QA only). Build from the same portable and
+      # exact runtime bytes just compiled and accepted by the Hotfix24 job.
+      # This closes the PR test provenance gap without touching public RC1.
+      - name: Build exact PR-source Hotfix25 and record artifact hash chain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expectedHead = '${{ github.event.pull_request.head.sha }}'
+          $actualHead = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actualHead -ne $expectedHead) {
+            throw "HF25_EXACT_PR_SOURCE_MISMATCH expected=$expectedHead actual=$actualHead"
+          }
+          $expectedRuntime = $env:HF24_RUNTIME_SHA256
+          if ($expectedRuntime -notmatch '^[a-f0-9]{64}$') { throw 'HF25_EXACT_RUNTIME_HASH_NOT_AVAILABLE' }
+          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          if (-not (Test-Path -LiteralPath $portable)) { throw 'HF25_EXACT_PORTABLE_NOT_FOUND' }
+          $portableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $portable).Hash.ToLowerInvariant()
+          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-HF25-SourceHashProbe'
+          if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Recurse -Force }
+          Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+          $exe = Join-Path $probe 'bin\BridgeX.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw 'HF25_EXACT_SOURCE_RUNTIME_MISSING' }
+          $runtimeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+          if ($runtimeHash -ne $expectedRuntime) {
+            throw "HF25_EXACT_RUNTIME_CHAIN_MISMATCH expected=$expectedRuntime actual=$runtimeHash"
+          }
+          $out = Join-Path $PWD 'dist-hf25-source'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $qa = Join-Path $out 'BridgeX-Hotfix25-Source-Build-QA.txt'
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix25.ps1 -PortableZip $portable -OutputDirectory $out -ExpectedBridgeXSha256 $runtimeHash 2>&1 | Tee-Object -FilePath $qa
+          if ($LASTEXITCODE -ne 0) { throw "HF25_EXACT_SOURCE_PACKAGING_FAILED=$LASTEXITCODE" }
+          $msi = Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi'
+          $setup = Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          foreach ($file in @($msi, $setup)) {
+            if (-not (Test-Path -LiteralPath $file)) { throw "HF25_EXACT_SOURCE_ARTIFACT_MISSING=$file" }
+          }
+          $msiHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $msi).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+          $manifest = Join-Path $out 'BridgeX-Hotfix25-PR-Source-HashChain.txt'
+          @(
+            'ARTIFACT_CLASS=PR_TEST_ONLY'
+            'RELEASE_PROMOTION_AUTHORITY=NONE'
+            "SOURCE_SHA=$actualHead"
+            "PORTABLE_ZIP_SHA256=$portableHash"
+            "RUNTIME_BRIDGEX_EXE_SHA256=$runtimeHash"
+            "MSI_SHA256=$msiHash"
+            "SETUP_EXE_SHA256=$setupHash"
+            'SOURCE_RUNTIME_MSI_SETUP_CHAIN_QA=PASS'
+            'WINDOWS_E2E=NOT_YET_VERIFIED'
+          ) | Set-Content -LiteralPath $manifest -Encoding utf8
+          Write-Host "HF25_PR_SOURCE_SHA=$actualHead"
+          Write-Host "HF25_PR_RUNTIME_SHA256=$runtimeHash"
+          Write-Host "HF25_PR_MSI_SHA256=$msiHash"
+          Write-Host "HF25_PR_SETUP_SHA256=$setupHash"
+          Write-Host 'HF25_PR_SOURCE_ARTIFACT_HASH_CHAIN=PASS_QA_ONLY'
+
+      - name: Windows E2E for source-derived Hotfix25
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          $setup = Join-Path $PWD 'dist-hf25-source\TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip $portable -Hotfix25Setup $setup -ExpectedBridgeXSha256 $env:HF24_RUNTIME_SHA256
+          if ($LASTEXITCODE -ne 0) { throw "HF25_PR_SOURCE_WINDOWS_E2E_FAILED=$LASTEXITCODE" }
+          $manifest = Join-Path $PWD 'dist-hf25-source\BridgeX-Hotfix25-PR-Source-HashChain.txt'
+          if (-not (Test-Path -LiteralPath $manifest)) { throw 'HF25_PR_SOURCE_HASH_MANIFEST_MISSING' }
+          'WINDOWS_E2E=PASS' | Add-Content -LiteralPath $manifest -Encoding utf8
+          Write-Host 'HF25_PR_SOURCE_TO_WINDOWS_E2E=PASS_QA_ONLY'
+
+      - name: Upload source-derived Hotfix25 Windows logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-source-hotfix25-windows-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/**/*.log
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/windows-qa-failure-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload source-derived Hotfix25 QA candidate
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-source-hotfix25-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
+            dist-hf25-source/TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe
+            dist-hf25-source/TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi
+            dist-hf25-source/BridgeX-Hotfix25-Source-Build-QA.txt
+            dist-hf25-source/BridgeX-Hotfix25-PR-Source-HashChain.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Hotfix24 candidate
         if: always()
         uses: actions/upload-artifact@v4
@@ -930,6 +1033,8 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       # Installer-only regression QA reuses a pinned, already-published runtime.
       # It is NOT an exact-main compile, release candidate, or publication authority.
