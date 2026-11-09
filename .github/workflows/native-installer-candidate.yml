@@ -1131,6 +1131,17 @@ jobs:
           & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip (Join-Path $PWD "dist\$env:BUILD16_NAME.zip") -Hotfix25Setup (Join-Path $PWD "dist-hf25\$env:HF25_SETUP_NAME") -ExpectedBridgeXSha256 $env:HF25_RUNTIME_SHA256
           if ($LASTEXITCODE -ne 0) { throw "HF25_NO_REBOOT_WINDOWS_QA_FAILED=$LASTEXITCODE" }
 
+      - name: Upload Hotfix25 Windows E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-hotfix25-windows-e2e-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/**/*.log
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/windows-qa-failure-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload Hotfix25 candidate
         if: always()
         uses: actions/upload-artifact@v4

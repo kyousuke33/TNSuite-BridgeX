@@ -16,15 +16,50 @@ if (!(Test-Path -LiteralPath $Hotfix25Setup)) { throw 'MISSING_SETUP' }
 if (Test-Path $root) { Remove-Item $root -Recurse -Force }
 New-Item $root -ItemType Directory -Force | Out-Null
 
+# The Burn exit code alone cannot distinguish MSI custom-action, file-lock,
+# reboot or registration failures. Keep exact GitHub-hosted MSI/Burn diagnostics
+# for every failed case; do not downgrade 1603 or 3010 into PASS.
+function Write-FailureEvidence([string]$case,[string]$reason) {
+ $summary=Join-Path $root 'windows-qa-failure-summary.txt'
+ "CASE=$case REASON=$reason" | Out-File -LiteralPath $summary -Encoding utf8 -Append
+ $logs=@(Get-ChildItem -LiteralPath $root -Filter '*.log' -File -Recurse -ErrorAction SilentlyContinue)
+ foreach ($file in $logs) {
+  "DIAGNOSTIC_LOG=$($file.FullName)" | Out-File -LiteralPath $summary -Encoding utf8 -Append
+  Write-Host "HF25_DIAGNOSTIC_LOG=$($file.Name)"
+  $matches=@(Select-String -LiteralPath $file.FullName -Pattern @(
+   'Return value 3', '1603', '3010', '0x80070643', '0x80070020',
+   'Error 1[0-9]{3}', 'Info 1903', 'ReplacedInUseFiles',
+   'restart: Required', 'ForceCloseBridgeX', 'WixQuietExec',
+   'MSIRESTARTMANAGERCONTROL', 'Failed to execute', 'failed to install'
+  ) -ErrorAction SilentlyContinue | Select-Object -Last 45)
+  foreach ($match in $matches) {
+   $item="$($file.Name):$($match.LineNumber): $($match.Line)"
+   $item | Out-File -LiteralPath $summary -Encoding utf8 -Append
+   Write-Host "HF25_DIAGNOSTIC=$item"
+  }
+ }
+ if ($logs.Count -eq 0) {
+  'DIAGNOSTIC_LOGS=MISSING' | Out-File -LiteralPath $summary -Encoding utf8 -Append
+  Write-Host 'HF25_DIAGNOSTIC_LOGS=MISSING'
+ }
+}
 function Run-Setup([string]$case,[string]$setup,[string[]]$arguments) {
  $log=Join-Path $root "$case-burn.log"
  $argsToRun=@($arguments)+@('/log',$log)
  $p=Start-Process -FilePath $setup -ArgumentList $argsToRun -PassThru -Wait
- if ($p.ExitCode -ne 0) { throw "$($case)=FAIL exit=$($p.ExitCode) log=$log (3010 not accepted)" }
+ if ($p.ExitCode -ne 0) {
+  try { Write-FailureEvidence $case "INSTALLER_EXIT_$($p.ExitCode)" }
+  catch { Write-Warning "HF25_DIAGNOSTIC_COLLECTION_FAILED=$($_.Exception.Message)" }
+  throw "$($case)=FAIL exit=$($p.ExitCode) log=$log (3010 not accepted)"
+ }
  $logs=@(Get-ChildItem -LiteralPath $root -Filter "$case-burn*.log" -File)
  foreach($f in $logs) {
   $reboot=Select-String -LiteralPath $f.FullName -Pattern 'Info 1903.Scheduling reboot operation','MainEngineThread is returning 3010','ReplacedInUseFiles property. Its value is .1.','i319:.*restart: Required','i399:.*restart: Required'
-  if($reboot){ throw "$($case)=FAIL reboot log=$($f.Name): $($reboot[0].Line)" }
+  if($reboot){
+   try { Write-FailureEvidence $case "REBOOT_MARKER_$($f.Name)" }
+   catch { Write-Warning "HF25_DIAGNOSTIC_COLLECTION_FAILED=$($_.Exception.Message)" }
+   throw "$($case)=FAIL reboot log=$($f.Name): $($reboot[0].Line)"
+  }
  }
  Write-Host "$($case)=PASS exit=0"
 }
