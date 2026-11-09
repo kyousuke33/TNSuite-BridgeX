@@ -5,6 +5,7 @@
 - Correct the WiX pre-`InstallValidate` close to run for first install and maintenance; verify GUI/CLI processes are absent and fail closed rather than silently ignoring errors.
 - Re-enable standard Windows Installer Restart Manager (`MSIRESTARTMANAGERCONTROL=0`); retain `MSIDISABLERMRESTART=1` to avoid auto-relaunching the application.
 - Exit code `3010` is a QA failure; add Windows scenarios for fresh install over running legacy BridgeX, update, repair and uninstall, rejecting MSI reboot-scheduling evidence.
+- The Hotfix25 installer QA job uses the immutable public RC1 portable ZIP as a SHA-256-pinned **test-only runtime input** to bypass expired Actions artifacts and intermittent MSYS2 downloads; this does NOT prove a fresh exact-main runtime compilation and must never be promoted as the final release artifact.
 - These changes are source/QA only until tested on exact Windows build bytes. Do not alter public RC1 assets or publish replacement bytes using the RC1 identity.
 - Scope: Build12 installer only; no product runtime, RCP, production, signing, database or Build13 changes.
 

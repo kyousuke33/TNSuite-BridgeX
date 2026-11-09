@@ -1053,77 +1053,50 @@ jobs:
       - name: Checkout PR source
         uses: actions/checkout@v4
 
-      - name: Prepare Hotfix25 disposable runtime hooks
+      # Installer-only regression QA reuses a pinned, already-published runtime.
+      # It is NOT an exact-main compile, release candidate, or publication authority.
+      # Public RC1 bytes remain immutable; the newly built MSI/Bundle is test-only.
+      - name: Prepare exact-hash RC1 portable for installer-only QA
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildPath = '.\scripts\build-filezilla-dark.sh'
-          $build = Get-Content -LiteralPath $buildPath -Raw -Encoding UTF8
+          $tag = 'v0.5.0-build12-hotfix25-rc1'
+          $asset = 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-Portable.zip'
+          $expectedPortableHash = '1a2a752e21d8e698c0d1fe7839f94bfc2c0012451ba10a4b111d9bb8045d9299'
+          $expectedRuntimeHash = '5ec55edad4b44dec1e9419776d9b892384c008458fc8f96c3183df8e41e4a640'
+          $dist = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Path $dist -Force | Out-Null
 
-          $brandingOld = @'
-          log "Branding/UI asset QA - fail closed"
-          python "$QA/branding_asset_check.py" "$KIT" | tee "$WORK/branding-asset-report.txt"
-          grep -q '^BRANDING_ASSET_QA=PASS$' "$WORK/branding-asset-report.txt"
-          '@
-          $brandingNew = @'
-          log "Canonical branding contract QA - fail closed"
-          python "$KIT/scripts/qa/branding_contract_check.py" "$KIT" | tee "$WORK/branding-contract-report.txt"
-          grep -q '^BRANDING_CONTRACT_QA=PASS$' "$WORK/branding-contract-report.txt"
-          '@
-          $brandingOld = $brandingOld -replace "`r`n", "`n"
-          $brandingNew = $brandingNew -replace "`r`n", "`n"
-          if (-not $build.Contains($brandingOld.Trim())) { throw 'HF25_BRANDING_CONTRACT_ADAPTER_ANCHOR_MISSING' }
-          $build = $build.Replace($brandingOld.Trim(), $brandingNew.Trim())
+          & gh release download $tag -R $env:GITHUB_REPOSITORY -p $asset -D $dist --clobber
+          if ($LASTEXITCODE -ne 0) { throw "HF25_PINNED_PORTABLE_DOWNLOAD_FAILED=$LASTEXITCODE" }
+          $downloaded = Join-Path $dist $asset
+          if (-not (Test-Path -LiteralPath $downloaded -PathType Leaf)) { throw 'HF25_PINNED_PORTABLE_MISSING' }
+          $actualPortableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $downloaded).Hash.ToLowerInvariant()
+          if ($actualPortableHash -ne $expectedPortableHash) { throw "HF25_PINNED_PORTABLE_HASH_FAIL actual=$actualPortableHash" }
 
-          $patchNeedle = 'python "$KIT/scripts/patch_tnsuite_bridgex.py" "$SRC"'
-          $patchReplacement = $patchNeedle + "`n" +
-            'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"' + "`n" +
-            'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix25.py" "$SRC"'
-          if (-not $build.Contains($patchNeedle)) { throw 'HF25_RUNTIME_PATCH_HOOK_ANCHOR_MISSING' }
-          $build = $build.Replace($patchNeedle, $patchReplacement)
-
-          $exeNeedle = '[[ -s "$APP/bin/BridgeX.exe" ]] || { echo "ERROR: BridgeX.exe branding rename failed." >&2; exit 36; }'
-          $exeReplacement = $exeNeedle + "`n" + @'
-          BRIDGEX_APP_ICON_SOURCE="$KIT/assets/branding/BridgeX-AppIcon.ico"
-          BRIDGEX_APP_ICON_RUNTIME="$APP/bin/BridgeX-AppIcon.ico"
-          cp -f "$BRIDGEX_APP_ICON_SOURCE" "$BRIDGEX_APP_ICON_RUNTIME"
-          [[ -s "$BRIDGEX_APP_ICON_RUNTIME" ]] || { echo "ERROR: BridgeX runtime icon missing." >&2; exit 47; }
-          [[ "$(sha256sum "$BRIDGEX_APP_ICON_SOURCE" | awk '{print $1}')" == "$(sha256sum "$BRIDGEX_APP_ICON_RUNTIME" | awk '{print $1}')" ]] || { echo "ERROR: BridgeX runtime icon hash mismatch." >&2; exit 48; }
-          echo "BRIDGEX_APP_ICON_RUNTIME_QA=PASS"
-          '@
-          if (-not $build.Contains($exeNeedle)) { throw 'HF25_RUNTIME_ICON_PACKAGE_ANCHOR_MISSING' }
-          $build = $build.Replace($exeNeedle, $exeReplacement)
-          [IO.File]::WriteAllText((Resolve-Path $buildPath), $build, [Text.UTF8Encoding]::new($false))
-
-          if ((Get-FileHash -Algorithm SHA256 '.\assets\branding\BridgeX-AppIcon.ico').Hash.ToLowerInvariant() -ne $env:ICON_SHA256) {
-            throw 'HF25_CANONICAL_ICON_HASH_FAIL'
-          }
-          Write-Host 'HF25_BUILD_HOOKS=PASS'
-
-      - name: Build full Hotfix25 Windows runtime
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Build-TNSuiteBridgeX.ps1
-          if ($LASTEXITCODE -ne 0) { throw "HF25_FULL_RUNTIME_BUILD_FAILED=$LASTEXITCODE" }
-
-          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
-          if (-not (Test-Path -LiteralPath $portable)) { throw "HF25_PORTABLE_MISSING=$portable" }
-
-          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix25-PortableProbe'
-          if (Test-Path $probe) { Remove-Item $probe -Recurse -Force }
+          $portable = Join-Path $dist "$env:BUILD16_NAME.zip"
+          Copy-Item -LiteralPath $downloaded -Destination $portable -Force
+          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix25-PinnedPortable'
+          if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Recurse -Force }
           Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+
           $runtimeExe = Join-Path $probe 'bin\BridgeX.exe'
           $runtimeIcon = Join-Path $probe 'bin\BridgeX-AppIcon.ico'
-          if (-not (Test-Path -LiteralPath $runtimeExe)) { throw 'HF25_PORTABLE_RUNTIME_MISSING' }
-          if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF25_PORTABLE_ICON_MISSING' }
-          if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF25_PORTABLE_ICON_HASH_FAIL' }
+          if (-not (Test-Path -LiteralPath $runtimeExe -PathType Leaf)) { throw 'HF25_PINNED_RUNTIME_MISSING' }
+          if (-not (Test-Path -LiteralPath $runtimeIcon -PathType Leaf)) { throw 'HF25_PINNED_ICON_MISSING' }
+          $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeExe).Hash.ToLowerInvariant()
+          $iconSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeIcon).Hash.ToLowerInvariant()
+          if ($runtimeSha -ne $expectedRuntimeHash) { throw "HF25_PINNED_RUNTIME_HASH_FAIL actual=$runtimeSha" }
+          if ($iconSha -ne $env:ICON_SHA256) { throw "HF25_PINNED_ICON_HASH_FAIL actual=$iconSha" }
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "HF25_RUNTIME_SHA256=$runtimeSha`n", [Text.UTF8Encoding]::new($false))
 
-          $runtimeSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeExe).Hash.ToLowerInvariant()
-          if ($runtimeSha256 -notmatch '^[0-9a-f]{64}$') { throw "HF25_RUNTIME_SHA256_INVALID=$runtimeSha256" }
-          [IO.File]::AppendAllText($env:GITHUB_ENV, "HF25_RUNTIME_SHA256=$runtimeSha256`n", [Text.UTF8Encoding]::new($false))
-          Write-Host "HF25_RUNTIME_SHA256=$runtimeSha256"
-          Write-Host 'HF25_WINDOWS_COMPILE_QA=PASS'
+          Write-Host "HF25_PINNED_PORTABLE_SHA256=$actualPortableHash"
+          Write-Host "HF25_PINNED_RUNTIME_SHA256=$runtimeSha"
+          Write-Host 'HF25_RUNTIME_PROVENANCE=PUBLIC_RC1_EXACT_HASH_QA_ONLY'
+          Write-Host 'HF25_WINDOWS_COMPILE_QA=NOT_PERFORMED_BY_THIS_JOB'
+          Write-Host 'HF25_TEST_ONLY_BUILD_NOT_ELIGIBLE_FOR_PROMOTION=YES'
 
       - name: Install pinned WiX extensions
         shell: pwsh
