@@ -982,7 +982,7 @@ jobs:
           $manifest = Join-Path $PWD 'dist-hf25-source\BridgeX-Hotfix25-PR-Source-HashChain.txt'
           if (-not (Test-Path -LiteralPath $manifest)) { throw 'HF25_PR_SOURCE_HASH_MANIFEST_MISSING' }
           $manifestText = Get-Content -LiteralPath $manifest -Raw -Encoding utf8
-          if ($manifestText.Split('WINDOWS_E2E=NOT_YET_VERIFIED').Count -ne 2) {
+          if (([regex]::Matches($manifestText, [regex]::Escape('WINDOWS_E2E=NOT_YET_VERIFIED'))).Count -ne 1) {
             throw 'HF25_PR_SOURCE_E2E_MANIFEST_STATE_INVALID'
           }
           $manifestText = $manifestText.Replace('WINDOWS_E2E=NOT_YET_VERIFIED', 'WINDOWS_E2E=PASS')

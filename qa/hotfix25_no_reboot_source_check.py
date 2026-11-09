@@ -18,6 +18,8 @@ checks = {
     "windows_no_3010": '$p.ExitCode -ne 0' in windows and "Info 1903.Scheduling reboot operation" in windows,
     "wired_qa": "hotfix25_no_reboot_windows.ps1" in workflow,
     "exact_pr_checkout": workflow.count("ref: ${{ github.event.pull_request.head.sha }}") == 5,
+    "unambiguous_e2e_manifest": "([regex]::Matches($manifestText" in workflow
+        and ".Split('WINDOWS_E2E=NOT_YET_VERIFIED')" not in workflow,
     "source_derived_hf25_chain": all(
         marker in workflow for marker in (
             "Build exact PR-source Hotfix25 and record artifact hash chain",
