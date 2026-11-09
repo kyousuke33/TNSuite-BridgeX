@@ -170,7 +170,7 @@ jobs:
           Set-Content -LiteralPath $legacySentinel -Value 'legacy sentinel: installer must preserve this file' -NoNewline
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart','CreateDesktopShortcut=1','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0, 3010)) { throw "DEFAULT_INSTALL=FAIL exit=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "DEFAULT_INSTALL=FAIL exit=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $installedExe)) { throw 'DEFAULT_INSTALLED_BRIDGEX_EXE_MISSING' }
           $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
           if ($actualHash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "DEFAULT_INSTALLED_BRIDGEX_HASH=FAIL actual=$actualHash" }
@@ -188,7 +188,7 @@ jobs:
           Write-Host 'DEFAULT_RUNTIME_LAUNCH=PASS'
 
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "DEFAULT_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "DEFAULT_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
           if (Test-Path -LiteralPath $installedExe) { throw 'DEFAULT_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
           foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { throw "DESKTOP_SHORTCUT_REMAINS_AFTER_UNINSTALL=$shortcut" } }
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_UNINSTALL' }
@@ -217,7 +217,7 @@ jobs:
 
             $args = @('/quiet','/norestart',("InstallFolder={0}" -f $baseLocation),'CreateDesktopShortcut=0','LaunchAfterInstall=0')
             $install = Start-Process -FilePath $setup -ArgumentList $args -Wait -PassThru
-            if ($install.ExitCode -notin @(0, 3010)) { throw "$caseName`_INSTALL=FAIL exit=$($install.ExitCode)" }
+            if ($install.ExitCode -ne 0) { throw "$caseName`_INSTALL=FAIL exit=$($install.ExitCode)" }
             if (-not (Test-Path -LiteralPath $installedExe)) { throw "$caseName`_AUTO_SUBFOLDER_MISSING expected=$installedExe" }
             if (Test-Path -LiteralPath $wrongDirectExe) { throw "$caseName`_PAYLOAD_INSTALLED_DIRECTLY_IN_BASE path=$wrongDirectExe" }
             if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw "$caseName`_STILL_INSTALLED_TO_C_DEFAULT" }
@@ -234,7 +234,7 @@ jobs:
             $runtime.WaitForExit()
 
             $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-            if ($uninstall.ExitCode -notin @(0, 3010)) { throw "$caseName`_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+            if ($uninstall.ExitCode -ne 0) { throw "$caseName`_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
             if (Test-Path -LiteralPath $installedExe) { throw "$caseName`_MANAGED_FILE_REMAINS_AFTER_UNINSTALL" }
             if (Test-Path -LiteralPath $tnsuiteRoot) { Remove-Item -LiteralPath $tnsuiteRoot -Recurse -Force }
           }
@@ -268,11 +268,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "LEGACY_HOTFIX20_INSTALL=FAIL exit=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "LEGACY_HOTFIX20_INSTALL=FAIL exit=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe'))) { throw 'LEGACY_C_INSTALL_PRECONDITION=FAIL' }
 
           $upgrade = Start-Process -FilePath $newSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($upgrade.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION=FAIL exit=$($upgrade.ExitCode)" }
+          if ($upgrade.ExitCode -ne 0) { throw "UPGRADE_RELOCATION=FAIL exit=$($upgrade.ExitCode)" }
           if (-not (Test-Path -LiteralPath $newExe)) { throw "UPGRADE_RELOCATION_NEW_PATH_MISSING=$newExe" }
           if (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe')) { throw 'UPGRADE_RELOCATION_OLD_C_PATH_STILL_HAS_MANAGED_EXE' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $newExe).Hash.ToLowerInvariant()
@@ -280,7 +280,7 @@ jobs:
           Write-Host "UPGRADE_RELOCATION_FROM_C=PASS final=$newRoot"
 
           $uninstall = Start-Process -FilePath $newSetup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "UPGRADE_RELOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
           if (Test-Path -LiteralPath $newExe) { throw 'UPGRADE_RELOCATION_MANAGED_FILE_REMAINS' }
           if (Test-Path -LiteralPath $base) { Remove-Item -LiteralPath $base -Recurse -Force }
           if (Test-Path -LiteralPath $oldRoot) { Remove-Item -LiteralPath $oldRoot -Recurse -Force }
@@ -404,7 +404,7 @@ jobs:
           foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { Remove-Item -LiteralPath $shortcut -Force } }
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart','CreateDesktopShortcut=1','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "INSTALL_FAILED=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "INSTALL_FAILED=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'INSTALLED_EXE_MISSING' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
           if ($hash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "INSTALLED_EXE_HASH_FAIL=$hash" }
@@ -415,7 +415,7 @@ jobs:
           Write-Host "RUNNING_BRIDGEX_PRECONDITION=PASS pid=$($app.Id)"
 
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "UNINSTALL_FAILED=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "UNINSTALL_FAILED=$($uninstall.ExitCode)" }
           Start-Sleep -Seconds 1
           $app.Refresh()
           if (-not $app.HasExited) { throw "BRIDGEX_PROCESS_STILL_RUNNING_AFTER_UNINSTALL pid=$($app.Id)" }
@@ -446,14 +446,14 @@ jobs:
           $exe = Join-Path $root 'bin\BridgeX.exe'
           New-Item -ItemType Directory -Force -Path $base | Out-Null
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "CUSTOM_INSTALL_FAILED=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "CUSTOM_INSTALL_FAILED=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw "CUSTOM_LOCATION_MISSING=$exe" }
           if (Test-Path -LiteralPath (Join-Path $env:ProgramFiles 'TNSuite\BridgeX\bin\BridgeX.exe')) { throw 'CUSTOM_LOCATION_FELL_BACK_TO_C' }
           $app = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
           Start-Sleep -Seconds 3
           if ($app.HasExited) { throw 'CUSTOM_RUNTIME_PRECONDITION_FAIL' }
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "CUSTOM_UNINSTALL_FAILED=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "CUSTOM_UNINSTALL_FAILED=$($uninstall.ExitCode)" }
           $app.Refresh()
           if (-not $app.HasExited) { throw 'CUSTOM_RUNNING_APP_NOT_CLOSED' }
           if (Test-Path -LiteralPath $exe) { throw 'CUSTOM_MANAGED_EXE_REMAINS' }
@@ -632,7 +632,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "HOTFIX22_INSTALL_FAILED=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "HOTFIX22_INSTALL_FAILED=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HOTFIX22_CUSTOM_LOCATION_MISSING' }
           if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'HOTFIX22_CUSTOM_LOCATION_PRECONDITION_FELL_BACK_TO_C' }
 
@@ -893,7 +893,7 @@ jobs:
           $runtimeIcon = Join-Path $root 'bin\BridgeX-AppIcon.ico'
           if (Test-Path $base) { Remove-Item $base -Recurse -Force }
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "HF24_INSTALL_FAIL=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "HF24_INSTALL_FAIL=$($install.ExitCode)" }
           if (-not (Test-Path $exe) -or -not (Test-Path $runtimeIcon)) { throw 'HF24_RUNTIME_ICON_PAYLOAD_MISSING' }
           if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_INSTALLED_ICON_HASH_FAIL' }
 
@@ -966,7 +966,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "HF24_PREVIOUS_INSTALL_FAILED=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "HF24_PREVIOUS_INSTALL_FAILED=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HF24_PREVIOUS_CUSTOM_LOCATION_MISSING' }
           if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'HF24_PREVIOUS_CUSTOM_LOCATION_FELL_BACK_TO_C' }
 
@@ -1181,7 +1181,7 @@ jobs:
             '/quiet','/norestart',("InstallFolder={0}" -f $base),
             'CreateDesktopShortcut=0','LaunchAfterInstall=0'
           ) -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "HF25_INSTALL_FAIL=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "HF25_INSTALL_FAIL=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HF25_INSTALLED_EXE_MISSING' }
 
           Add-Type @'
@@ -1272,6 +1272,13 @@ jobs:
 
           $remove = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw "HF25_UNINSTALL_FAIL=$($remove.ExitCode)" }
+
+      - name: No-reboot Windows QA (fresh with running legacy app, upgrade, repair, uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip (Join-Path $PWD "dist\$env:BUILD16_NAME.zip") -Hotfix25Setup (Join-Path $PWD "dist-hf25\$env:HF25_SETUP_NAME") -ExpectedBridgeXSha256 $env:HF25_RUNTIME_SHA256
+          if ($LASTEXITCODE -ne 0) { throw "HF25_NO_REBOOT_WINDOWS_QA_FAILED=$LASTEXITCODE" }
 
       - name: Upload Hotfix25 candidate
         if: always()

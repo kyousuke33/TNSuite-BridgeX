@@ -66,6 +66,8 @@ python3 qa/locale_helper_check.py
 python3 qa/fresh_env_dependency_check.py scripts/build-filezilla-dark.sh
 python3 qa/contrast_check.py
 
+python3 qa/hotfix25_no_reboot_source_check.py
+
 artifact_workflow='.github/workflows/native-installer-candidate.yml'
 if grep -Fq 'CANONICAL_ARTIFACT_ID:' "$artifact_workflow"; then
   echo 'PR_CANONICAL_ARTIFACT_RESOLUTION_QA=FAIL reason=HARD_CODED_ACTIONS_ARTIFACT_ID' >&2

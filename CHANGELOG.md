@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Build12 Hotfix25 no-reboot installer regression (QA-only, not released)
+- Office 2026-11-09 exact RC1 MSI log: first-time MSI registration with existing `BridgeX.exe` PID 51540 holding two `libfzclient-*.dll` files; `ForceCloseBridgeX` was skipped because its action condition required `Installed OR WIX_UPGRADE_DETECTED`.
+- Correct the WiX pre-`InstallValidate` close to run for first install and maintenance; verify GUI/CLI processes are absent and fail closed rather than silently ignoring errors.
+- Re-enable standard Windows Installer Restart Manager (`MSIRESTARTMANAGERCONTROL=0`); retain `MSIDISABLERMRESTART=1` to avoid auto-relaunching the application.
+- Exit code `3010` is a QA failure; add Windows scenarios for fresh install over running legacy BridgeX, update, repair and uninstall, rejecting MSI reboot-scheduling evidence.
+- These changes are source/QA only until tested on exact Windows build bytes. Do not alter public RC1 assets or publish replacement bytes using the RC1 identity.
+- Scope: Build12 installer only; no product runtime, RCP, production, signing, database or Build13 changes.
+
 ## Unreleased — governed roadmap execution and Build12 closure
 - Make the accepted `PROJECT_BIG_PICTURE.md` → `ROADMAP.md` → `CURRENT_STATE.md` → `DECISIONS.md` chain the explicit durable execution authority for BridgeX AI/contributors.
 - Require every implementation to identify the active release, phase, milestone, current blocker and next acceptance gate before mutating source.
