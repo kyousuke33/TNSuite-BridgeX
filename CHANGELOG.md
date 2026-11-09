@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased — Build12 Hotfix25 no-reboot installer regression (QA-only, not released)
+- Source-built Hotfix24 runtime is now compiled with wxWidgets 3.3.4; WiX base builder had obsolete libfilezilla-58/libfzssh-13 hardcoded while current imported DLLs are libfilezilla-60/libfzssh-16. Preserve exact two BridgeX-private DLL guards and accept only reviewed legacy 58/13 or current 60/16 pairs. Mixed, duplicated or unknown library ABI fails closed; no release authority implied.
 - Windows dry-run found wxWidgets 3.3.4 DLLs (wxbase334/wxmsw334) but a hardcoded 333 static QA check. Keep the historical Build12-Hotfix16 source/manifest byte-exact: apply reviewed 3.3.3/3.3.4 ABI checks only to disposable Windows build copies via the existing release adapter and Hotfix24 QA workflow. Source-gate selftests reject unreviewed/mixed/missing wx DLLs. Windows compile success is not Owner UAT or publication authority.
 - Office 2026-11-09 exact RC1 MSI log: first-time MSI registration with existing `BridgeX.exe` PID 51540 holding two `libfzclient-*.dll` files; `ForceCloseBridgeX` was skipped because its action condition required `Installed OR WIX_UPGRADE_DETECTED`.
 - Correct the WiX pre-`InstallValidate` close to run for first install and maintenance; verify GUI/CLI processes are absent and fail closed rather than silently ignoring errors.

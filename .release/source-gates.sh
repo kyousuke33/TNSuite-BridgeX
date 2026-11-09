@@ -68,6 +68,7 @@ python3 qa/contrast_check.py
 
 python3 qa/patch_wx_build_runtime.py --self-test
 python3 qa/wx_runtime_abi_check.py --self-test
+python3 qa/wix_runtime_abi_source_check.py
 python3 qa/hotfix25_no_reboot_source_check.py
 
 artifact_workflow='.github/workflows/native-installer-candidate.yml'

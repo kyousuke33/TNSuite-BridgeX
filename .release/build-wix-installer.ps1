@@ -20,9 +20,7 @@ $BundleUpgradeCode = '{7E03045D-320D-4AB5-8DD0-02BFF00F058B}'
 $ExpectedBridgeXHash = '9d528d211950f3df0609c05a8c1e01725927ae76b70bed2ad0fe9b97c53504d6'
 $RequiredDlls = @(
     'bin\libfzclient-commonui-private-3-70-6.dll',
-    'bin\libfzclient-private-3-70-6.dll',
-    'bin\libfilezilla-58.dll',
-    'bin\libfzssh-13.0.0.dll'
+    'bin\libfzclient-private-3-70-6.dll'
 )
 
 function XmlEscape([string]$value) {
@@ -59,6 +57,29 @@ foreach ($relative in $RequiredDlls) {
     if (-not (Test-Path -LiteralPath $full)) { throw "RUNTIME_DLL=FAIL path=$relative" }
     Write-Host "RUNTIME_DLL=PASS path=$relative"
 }
+# Fail closed on a mixed, missing, unreviewed or duplicate libfilezilla/libfzssh
+# ABI pair. The historical pinned RC1 and currently source-built MSYS2 runtime
+# use different, explicitly reviewed pairs.
+$knownPairs = @(
+    @{ Filezilla='libfilezilla-58.dll'; Fzssh='libfzssh-13.0.0.dll'; Label='LEGACY_RC1' },
+    @{ Filezilla='libfilezilla-60.dll'; Fzssh='libfzssh-16.0.0.dll'; Label='MSYS2_20261109' }
+)
+$bin = Join-Path $PayloadRoot 'bin'
+$files = @(Get-ChildItem -LiteralPath $bin -File)
+$libfz = @($files | Where-Object { $_.Name -match '^libfilezilla-[0-9]+\.dll$' })
+$libssh = @($files | Where-Object { $_.Name -match '^libfzssh-[0-9]+(\.[0-9]+)+\.dll$' })
+if ($libfz.Count -ne 1 -or $libssh.Count -ne 1) {
+    throw "RUNTIME_ABI_DLL_COUNT_FAIL filezilla=$($libfz.Count) fzssh=$($libssh.Count)"
+}
+$accepted = @($knownPairs | Where-Object {
+    $_.Filezilla -eq $libfz[0].Name -and $_.Fzssh -eq $libssh[0].Name
+})
+if ($accepted.Count -ne 1) {
+    throw "RUNTIME_ABI_DLL_PAIR_UNREVIEWED filezilla=$($libfz[0].Name) fzssh=$($libssh[0].Name)"
+}
+Write-Host "RUNTIME_DLL=PASS path=bin\$($libfz[0].Name)"
+Write-Host "RUNTIME_DLL=PASS path=bin\$($libssh[0].Name)"
+Write-Host "RUNTIME_ABI_DLL_PAIR=PASS profile=$($accepted[0].Label)"
 
 $files = @(Get-ChildItem -LiteralPath $PayloadRoot -File -Recurse | Sort-Object FullName)
 if ($files.Count -lt 10) { throw "PAYLOAD_FILE_COUNT_UNEXPECTED=$($files.Count)" }
