@@ -87,6 +87,11 @@ grep -q '^BRANDING_CONTRACT_QA=PASS$' "$WORK/branding-contract-report.txt"
 $brandingNew = $brandingNew -replace "`r`n", "`n"
 Set-ExactReplacement -Path $BuildPipeline -Old $brandingOld -New $brandingNew -ExpectedCount 1 -Marker 'RELEASE_BUILD_ADAPTER_BRANDING_CONTRACT'
 
+# Apply the reviewed wxWidgets ABI check only to the disposable copy.
+# Do not edit the baseline-manifest-pinned scripts/build-filezilla-dark.sh.
+& python.exe (Join-Path $WorkRoot 'qa\patch_wx_build_runtime.py') $BuildPipeline
+if ($LASTEXITCODE -ne 0) { throw "WX_DISPOSABLE_BUILD_PATCH_FAILED=$LASTEXITCODE" }
+
 # Hotfix16 was withdrawn after the installer artifact received heuristic
 # detections. The remediated bytes must never reuse that public identity.
 # Stamp the disposable release build as Build12-Hotfix17 while preserving the

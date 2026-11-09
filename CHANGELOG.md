@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased — Build12 Hotfix25 no-reboot installer regression (QA-only, not released)
-- Full Windows dry-run exposed wxWidgets 3.3.4 DLLs (wxbase334/wxmsw334) while static QA hardcoded the 3.3.3 suffix (333). Version 3.3.4 compiled/linked but is not yet Owner GUI UAT. Allow only 3.3.3/3.3.4 and validate runtime DLLs against wx-config ABI; reject missing, mixed and unreviewed DLLs with source-gate selftests. No final release authorization implied.
+- Windows dry-run found wxWidgets 3.3.4 DLLs (wxbase334/wxmsw334) but a hardcoded 333 static QA check. Keep the historical Build12-Hotfix16 source/manifest byte-exact: apply reviewed 3.3.3/3.3.4 ABI checks only to disposable Windows build copies via the existing release adapter and Hotfix24 QA workflow. Source-gate selftests reject unreviewed/mixed/missing wx DLLs. Windows compile success is not Owner UAT or publication authority.
 - Office 2026-11-09 exact RC1 MSI log: first-time MSI registration with existing `BridgeX.exe` PID 51540 holding two `libfzclient-*.dll` files; `ForceCloseBridgeX` was skipped because its action condition required `Installed OR WIX_UPGRADE_DETECTED`.
 - Correct the WiX pre-`InstallValidate` close to run for first install and maintenance; verify GUI/CLI processes are absent and fail closed rather than silently ignoring errors.
 - Re-enable standard Windows Installer Restart Manager (`MSIRESTARTMANAGERCONTROL=0`); retain `MSIDISABLERMRESTART=1` to avoid auto-relaunching the application.
