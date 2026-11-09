@@ -25,7 +25,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & pwsh.exe -NoLogo -NoProfile -File .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
           if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX Toolset
@@ -266,7 +266,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & pwsh.exe -NoLogo -NoProfile -File .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
           if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX extensions
@@ -397,7 +397,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & pwsh.exe -NoLogo -NoProfile -File .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist','dist-prev')
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist','dist-prev')
           if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX extensions
