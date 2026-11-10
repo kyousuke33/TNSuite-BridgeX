@@ -1,5 +1,34 @@
 # Changelog
 
+## Build12 Hotfix25 — runtime version identity fix (QA-only)
+- Fix About and Welcome displaying stale `Build12-Hotfix16` while the source-built Hotfix25 runtime is installed. Introduce a fail-closed disposable-source runtime overlay, preserving the historical pinned baseline; gate exact About/Welcome `Build12-Hotfix25` identity before Windows packaging. Previous QA Setup/EXE hashes remain valid as historical evidence only.
+
+## Build12 Hotfix25 manual unsigned release workflow (not yet published)
+- Align the existing protected-main Windows build and promotion flow from obsolete Hotfix17 NSIS to source-built Hotfix25 WiX/Burn, using the same disposable Hotfix24 source preparation as native installer QA.
+- Generate immutable Setup + portable + SHA256SUMS + SHA source/runtime/MSI/Setup manifest, validated by real Windows fresh/upgrade/repair/uninstall E2E.
+- Reserve the next Hotfix25 RC2 prerelease identity without altering RC1; no Stable release, automatic publication or Auto Update is authorized.
+- Release promotion remains separately gated by exact protected-main source/build, accepted multi-engine AV evidence and Owner release/UAT acceptance.
+
+## Owner release-channel decision — 2026-11-10 (documentation only)
+- Build12 manual download may use an **unsigned** WiX/MSI/portable artifact after exact-main release gates and Owner acceptance. The Owner will not purchase paid Authenticode services; no signing bypass, SmartScreen suppression or automatic updater is authorized.
+- Record current release pipeline mismatch: `.github/workflows/windows-release.yml` still builds legacy Hotfix17/NSIS and is **not** eligible to publish accepted Hotfix25/WiX bytes. It must be aligned and reverified before any manual release publication.
+- PR #54 source-built Hotfix25 QA was Windows E2E PASS on exact head `7cc8753da3e89d7a769953ea74cc6601f91b46ab`; canonical-main RC and exact final AV/UAT are separate.
+
+## Unreleased — Build12 Hotfix25 no-reboot installer regression (QA-only, not released)
+- QA hash-chain manifest state is replaced exactly once only after Windows E2E PASS; regex marker counting avoids PowerShell String.Split(char[]) semantics (verified incorrect on OFFICE).
+- Fix P0.E PR provenance discrepancy: GitHub pull_request default actions/checkout used synthetic merge SHA instead of exact PR head. Pin all native installer jobs to the actual PR head. The source-built Hotfix24 job now builds and validates a Hotfix25 QA installer from that same compiled portable, records exact source/portable/runtime/MSI/Setup SHA256, runs real no-reboot Windows E2E, and uploads only test-class candidate evidence. This does not authorize merging, Authenticode signing, Stable, or published release.
+- Source-built Hotfix24 runtime is now compiled with wxWidgets 3.3.4; WiX base builder had obsolete libfilezilla-58/libfzssh-13 hardcoded while current imported DLLs are libfilezilla-60/libfzssh-16. Preserve exact two BridgeX-private DLL guards and accept only reviewed legacy 58/13 or current 60/16 pairs. Mixed, duplicated or unknown library ABI fails closed; no release authority implied.
+- Windows dry-run found wxWidgets 3.3.4 DLLs (wxbase334/wxmsw334) but a hardcoded 333 static QA check. Keep the historical Build12-Hotfix16 source/manifest byte-exact: apply reviewed 3.3.3/3.3.4 ABI checks only to disposable Windows build copies via the existing release adapter and Hotfix24 QA workflow. Source-gate selftests reject unreviewed/mixed/missing wx DLLs. Windows compile success is not Owner UAT or publication authority.
+- Office 2026-11-09 exact RC1 MSI log: first-time MSI registration with existing `BridgeX.exe` PID 51540 holding two `libfzclient-*.dll` files; `ForceCloseBridgeX` was skipped because its action condition required `Installed OR WIX_UPGRADE_DETECTED`.
+- Correct the WiX pre-`InstallValidate` close to run for first install and maintenance; verify GUI/CLI processes are absent and fail closed rather than silently ignoring errors.
+- Re-enable standard Windows Installer Restart Manager (`MSIRESTARTMANAGERCONTROL=0`); retain `MSIDISABLERMRESTART=1` to avoid auto-relaunching the application.
+- Exit code `3010` is a QA failure; add Windows scenarios for fresh install over running legacy BridgeX, update, repair and uninstall, rejecting MSI reboot-scheduling evidence.
+- The Hotfix25 installer QA job uses the immutable public RC1 portable ZIP as a SHA-256-pinned **test-only runtime input** to bypass expired Actions artifacts and intermittent MSYS2 downloads; this does NOT prove a fresh exact-main runtime compilation and must never be promoted as the final release artifact.
+- Historical Hotfix21/22/23 installer QA now consumes the same SHA256-verified public RC1 portable input instead of expired GitHub Actions canonical-main artifacts, with explicit `QA_ONLY` provenance and unchanged functional test coverage; these are not source-build evidence.
+- Windows full-build jobs prefetch pinned MSYS2 2026-06-11 installer from the official MSYS2 repository mirror with verification of the existing toolchain SHA256; release adapter and canonical build manifest remain untouched.
+- These changes are source/QA only until tested on exact Windows build bytes. Do not alter public RC1 assets or publish replacement bytes using the RC1 identity.
+- Scope: Build12 installer only; no product runtime, RCP, production, signing, database or Build13 changes.
+
 ## Unreleased — governed roadmap execution and Build12 closure
 - Make the accepted `PROJECT_BIG_PICTURE.md` → `ROADMAP.md` → `CURRENT_STATE.md` → `DECISIONS.md` chain the explicit durable execution authority for BridgeX AI/contributors.
 - Require every implementation to identify the active release, phase, milestone, current blocker and next acceptance gate before mutating source.

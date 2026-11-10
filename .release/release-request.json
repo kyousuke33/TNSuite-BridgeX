@@ -1,9 +1,13 @@
 {
   "schema": "tnsuite.bridgex.release-request.v1",
-  "tag": "v0.5-Build12-Hotfix17",
-  "title": "TNSuite BridgeX v0.5 Build12-Hotfix17",
-  "build_name": "TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full",
+  "tag": "v0.5.0-build12-hotfix25-rc2",
+  "title": "TNSuite BridgeX v0.5 Build12 Hotfix25 — RC2 (Unsigned)",
+  "build_name": "TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX",
   "channel": "github-releases",
   "rcp_profile": "tnsuite.public-desktop-github-release.v1",
-  "rcp_authority_sha": "2066b02762f2b6018dcc7d9f1f0230309b4674a3"
+  "rcp_authority_sha": "2066b02762f2b6018dcc7d9f1f0230309b4674a3",
+  "manual_download_only": true,
+  "authenticode_required": false,
+  "auto_update_enabled": false,
+  "release_status": "prerelease"
 }

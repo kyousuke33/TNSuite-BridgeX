@@ -84,15 +84,19 @@ jobs:
           request_profile="$(jq -r '.rcp_profile' .release/release-request.json)"
           request_authority="$(jq -r '.rcp_authority_sha' .release/release-request.json)"
 
-          [[ "$request_tag" == 'v0.5-Build12-Hotfix17' ]] || { echo "PROMOTION_TAG=FAIL actual=$request_tag"; exit 42; }
-          [[ "$request_title" == 'TNSuite BridgeX v0.5 Build12-Hotfix17' ]] || { echo 'PROMOTION_TITLE=FAIL'; exit 42; }
-          [[ "$request_build" == 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full' ]] || { echo 'PROMOTION_BUILD_NAME=FAIL'; exit 42; }
+          [[ "$request_tag" == 'v0.5.0-build12-hotfix25-rc2' ]] || { echo "PROMOTION_TAG=FAIL actual=$request_tag"; exit 42; }
+          [[ "$request_title" == 'TNSuite BridgeX v0.5 Build12 Hotfix25 — RC2 (Unsigned)' ]] || { echo 'PROMOTION_TITLE=FAIL'; exit 42; }
+          [[ "$request_build" == 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX' ]] || { echo 'PROMOTION_BUILD_NAME=FAIL'; exit 42; }
           [[ "$request_profile" == 'tnsuite.public-desktop-github-release.v1' ]] || { echo 'PROMOTION_RCP_PROFILE=FAIL'; exit 42; }
           [[ "$request_authority" =~ ^[0-9a-f]{40}$ ]] || { echo 'PROMOTION_RCP_AUTHORITY=FAIL'; exit 42; }
+          [[ "$(jq -r '.manual_download_only' .release/release-request.json)" == 'true' ]] || { echo 'MANUAL_RELEASE_REQUIRED=FAIL'; exit 42; }
+          [[ "$(jq -r '.authenticode_required' .release/release-request.json)" == 'false' ]] || { echo 'UNSIGNED_POLICY_REQUIRED=FAIL'; exit 42; }
+          [[ "$(jq -r '.auto_update_enabled' .release/release-request.json)" == 'false' ]] || { echo 'AUTO_UPDATE_FORBIDDEN=FAIL'; exit 42; }
+          [[ "$(jq -r '.release_status' .release/release-request.json)" == 'prerelease' ]] || { echo 'PRERELEASE_REQUIRED=FAIL'; exit 42; }
 
           git fetch --no-tags origin main
-          git merge-base --is-ancestor "$SOURCE_SHA" origin/main || {
-            echo 'PROMOTION_CANONICAL_MAIN_SOURCE=FAIL reason=SOURCE_NOT_ON_MAIN'
+          [[ "$(git rev-parse origin/main)" == "$SOURCE_SHA" ]] || {
+            echo 'PROMOTION_CANONICAL_MAIN_SOURCE=FAIL reason=SOURCE_NOT_CURRENT_MAIN'
             exit 42
           }
 
@@ -210,11 +214,15 @@ jobs:
         run: |
           set -euo pipefail
           cat > verified-release/release-notes-verified.md <<EOF
-          # TNSuite BridgeX v0.5 Build12-Hotfix17
+          # TNSuite BridgeX Build12 Hotfix25 — RC2 (Unsigned)
 
-          **File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**
+          **Bản thử nghiệm (pre-release), tải thủ công trên Windows x64.**
 
-          Build12-Hotfix17 thay thế bản Hotfix16 đã bị thu hồi. Bản này dùng installer đã được harden lại và chỉ được phát hành sau khi đối chiếu SHA-256 cùng báo cáo VirusTotal của đúng artifact từ protected main.
+          **Không có chữ ký số Authenticode (Unsigned):** Windows có thể hiển thị Unknown Publisher hoặc SmartScreen. Kiểm tra đúng nguồn tải và SHA-256; không tắt Defender.
+
+          Không triển khai Auto Update trong kênh tải thủ công này.
+
+          Bản này dùng WiX Toolset 6 / Burn + MSI, khắc phục yêu cầu reboot khi file BridgeX đang mở; Windows installer lifecycle E2E đã được kiểm tra.
 
           ## Tải xuống
 
@@ -242,8 +250,8 @@ jobs:
           - SFTP / truyền tệp;
           - Windows installer và portable build;
           - CLI automation/SFTP có phạm vi giới hạn;
-          - installer không còn nhúng/chạy PowerShell helper hoặc tự động terminate BridgeX;
-          - installer dùng NSIS zlib thay cho solid LZMA.
+          - installer chỉ tự đóng các tiến trình BridgeX thuộc ứng dụng khi bảo trì;
+          - dùng WiX/Burn + MSI, không dùng NSIS cho bản này.
 
           ## Xác minh phát hành
 
@@ -259,7 +267,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$BRIDGEX_RELEASE_TAG" == 'v0.5-Build12-Hotfix17' ]]
+          [[ "$BRIDGEX_RELEASE_TAG" == 'v0.5.0-build12-hotfix25-rc2' ]]
           [[ "$BRIDGEX_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$INSTALLER_SHA256" =~ ^[0-9a-f]{64}$ ]]
           [[ "$PORTABLE_SHA256" =~ ^[0-9a-f]{64}$ ]]
@@ -289,7 +297,9 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$BRIDGEX_SOURCE_SHA" \
             --title "$BRIDGEX_RELEASE_TITLE" \
-            --notes-file verified-release/release-notes-verified.md
+            --notes-file verified-release/release-notes-verified.md \
+            --prerelease \
+            --latest=false
           echo 'PROMOTION_RELEASE_CREATED=yes' >> "$GITHUB_ENV"
           echo 'GITHUB_RELEASE_PUBLISHED=PASS'
 
@@ -327,7 +337,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${PROMOTION_RELEASE_CREATED:-no}" == 'yes' ]]; then
-            gh release delete 'v0.5-Build12-Hotfix17' --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            gh release delete 'v0.5.0-build12-hotfix25-rc2' --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
             echo 'FAILED_PROMOTION_RELEASE_WITHDRAWN=PASS'
           else
             echo 'FAILED_PROMOTION_RELEASE_NOT_CREATED=PASS'

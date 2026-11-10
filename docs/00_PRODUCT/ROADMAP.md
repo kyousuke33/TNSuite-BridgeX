@@ -109,16 +109,15 @@ Required outcomes:
 - no AV-evasion, packing, obfuscation or heuristic-bypass technique is introduced;
 - failed validation returns the workstream to the earliest owning acceptance criterion rather than spawning unrelated installer architectures.
 
-### P0.G — Code-signing foundation
+### P0.G — Signing policy / optional trusted-updater foundation
 
-**Status:** NOT VERIFIED / BLOCKED BY RC TRUST VALIDATION.
+**Status:** CLOSED AS NO-PAID-SIGNING POLICY FOR MANUAL DOWNLOAD; no signer configured.
 
-Required outcomes before production-grade update automation:
-- approved publisher/signing identity;
-- Authenticode signing policy for app and installer artifacts;
-- trusted timestamping policy;
-- signing evidence bound to the exact promoted artifact;
-- signing secrets remain outside public PR CI.
+Owner decision `SIGNING-002` (2026-11-10): do not buy a certificate or paid signing service. The first Build12 distribution is **manual-download-only, unsigned**, and must explicitly disclose that Windows may show an unknown-publisher/SmartScreen warning. This is a documented limitation, never a claim of Authenticode success.
+
+The old signed-updater acceptance remains **NOT IMPLEMENTED / OUT OF SCOPE**; `SIGNING-001` continues to prevent automatic install/update before an independently accepted trusted-update mechanism is available. Do not postpone a qualifying unsigned manual download solely to pursue a paid certificate.
+
+All unsigned release gates independent of signing continue to apply: immutable protected-main source/build, exact hashes, required Windows acceptance, exact-artifact AV, publication/rollback authority, and Owner release/UAT acceptance.
 
 ### P0.H — Production distribution
 
@@ -132,7 +131,9 @@ Required outcomes:
 
 ### P0 exit — Build12 CLOSED
 
-Build12 is closed only when the required P0 gates above are accepted. Until then:
+Build12 manual-download closure requires P0.E, applicable P0.F and P0.H, with the P0.G unsigned-manual-download policy documented in `SIGNING-002`; a paid signing provider is **not** an exit criterion for this channel. The production-grade automatic-update path remains blocked separately by `SIGNING-001`.
+
+Build12 is closed only when the applicable P0 gates above are accepted. Until then:
 
 ```text
 BUILD13=BLOCKED_UNTIL_BUILD12_CLOSED

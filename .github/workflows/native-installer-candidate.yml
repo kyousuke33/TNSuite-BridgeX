@@ -13,66 +13,22 @@ jobs:
   wix-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
-      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
 
     steps:
       - name: Checkout exact PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Download canonical main runtime artifact
+      - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $artifactZip = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-artifact.zip'
-          $artifactDir = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-artifact'
-          $headers = @{
-            Authorization = "Bearer $env:GH_TOKEN"
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          }
-          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
-          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
-          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
-          $matches = @($listing.artifacts | Where-Object {
-            -not $_.expired -and
-            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
-            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
-          })
-          if ($matches.Count -ne 1) {
-            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
-          }
-          $artifact = $matches[0]
-          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $artifactZip -MaximumRedirection 8
-          Expand-Archive -LiteralPath $artifactZip -DestinationPath $artifactDir -Force
-          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
-          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
-
-          $portable = Join-Path $artifactDir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
-          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
-          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          try {
-            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
-            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
-            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
-            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
-            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
-            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
-            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
-          }
-          finally {
-            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          }
-          New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
-          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
-          Write-Host "WIX_INSTALLER_RUNTIME_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
-          Write-Host 'WIX_INSTALLER_RUNTIME_SOURCE=CANONICAL_MAIN_ARTIFACT'
-          Write-Host 'WIX_INSTALLER_RUNTIME_SOURCE_QA=PASS'
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
+          if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX Toolset
         shell: pwsh
@@ -170,7 +126,7 @@ jobs:
           Set-Content -LiteralPath $legacySentinel -Value 'legacy sentinel: installer must preserve this file' -NoNewline
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart','CreateDesktopShortcut=1','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0, 3010)) { throw "DEFAULT_INSTALL=FAIL exit=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "DEFAULT_INSTALL=FAIL exit=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $installedExe)) { throw 'DEFAULT_INSTALLED_BRIDGEX_EXE_MISSING' }
           $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installedExe).Hash.ToLowerInvariant()
           if ($actualHash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "DEFAULT_INSTALLED_BRIDGEX_HASH=FAIL actual=$actualHash" }
@@ -188,7 +144,7 @@ jobs:
           Write-Host 'DEFAULT_RUNTIME_LAUNCH=PASS'
 
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "DEFAULT_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "DEFAULT_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
           if (Test-Path -LiteralPath $installedExe) { throw 'DEFAULT_MANAGED_FILE_REMAINS_AFTER_UNINSTALL' }
           foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { throw "DESKTOP_SHORTCUT_REMAINS_AFTER_UNINSTALL=$shortcut" } }
           if (-not (Test-Path -LiteralPath $legacySentinel)) { throw 'LEGACY_UNOWNED_FILE_WAS_DELETED_DURING_UNINSTALL' }
@@ -217,7 +173,7 @@ jobs:
 
             $args = @('/quiet','/norestart',("InstallFolder={0}" -f $baseLocation),'CreateDesktopShortcut=0','LaunchAfterInstall=0')
             $install = Start-Process -FilePath $setup -ArgumentList $args -Wait -PassThru
-            if ($install.ExitCode -notin @(0, 3010)) { throw "$caseName`_INSTALL=FAIL exit=$($install.ExitCode)" }
+            if ($install.ExitCode -ne 0) { throw "$caseName`_INSTALL=FAIL exit=$($install.ExitCode)" }
             if (-not (Test-Path -LiteralPath $installedExe)) { throw "$caseName`_AUTO_SUBFOLDER_MISSING expected=$installedExe" }
             if (Test-Path -LiteralPath $wrongDirectExe) { throw "$caseName`_PAYLOAD_INSTALLED_DIRECTLY_IN_BASE path=$wrongDirectExe" }
             if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw "$caseName`_STILL_INSTALLED_TO_C_DEFAULT" }
@@ -234,7 +190,7 @@ jobs:
             $runtime.WaitForExit()
 
             $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-            if ($uninstall.ExitCode -notin @(0, 3010)) { throw "$caseName`_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+            if ($uninstall.ExitCode -ne 0) { throw "$caseName`_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
             if (Test-Path -LiteralPath $installedExe) { throw "$caseName`_MANAGED_FILE_REMAINS_AFTER_UNINSTALL" }
             if (Test-Path -LiteralPath $tnsuiteRoot) { Remove-Item -LiteralPath $tnsuiteRoot -Recurse -Force }
           }
@@ -268,11 +224,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "LEGACY_HOTFIX20_INSTALL=FAIL exit=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "LEGACY_HOTFIX20_INSTALL=FAIL exit=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe'))) { throw 'LEGACY_C_INSTALL_PRECONDITION=FAIL' }
 
           $upgrade = Start-Process -FilePath $newSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($upgrade.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION=FAIL exit=$($upgrade.ExitCode)" }
+          if ($upgrade.ExitCode -ne 0) { throw "UPGRADE_RELOCATION=FAIL exit=$($upgrade.ExitCode)" }
           if (-not (Test-Path -LiteralPath $newExe)) { throw "UPGRADE_RELOCATION_NEW_PATH_MISSING=$newExe" }
           if (Test-Path -LiteralPath (Join-Path $oldRoot 'bin\BridgeX.exe')) { throw 'UPGRADE_RELOCATION_OLD_C_PATH_STILL_HAS_MANAGED_EXE' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $newExe).Hash.ToLowerInvariant()
@@ -280,7 +236,7 @@ jobs:
           Write-Host "UPGRADE_RELOCATION_FROM_C=PASS final=$newRoot"
 
           $uninstall = Start-Process -FilePath $newSetup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "UPGRADE_RELOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "UPGRADE_RELOCATION_UNINSTALL=FAIL exit=$($uninstall.ExitCode)" }
           if (Test-Path -LiteralPath $newExe) { throw 'UPGRADE_RELOCATION_MANAGED_FILE_REMAINS' }
           if (Test-Path -LiteralPath $base) { Remove-Item -LiteralPath $base -Recurse -Force }
           if (Test-Path -LiteralPath $oldRoot) { Remove-Item -LiteralPath $oldRoot -Recurse -Force }
@@ -300,63 +256,22 @@ jobs:
   hotfix22-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
-      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
 
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Download canonical runtime payload
+      - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $zip = Join-Path $env:RUNNER_TEMP 'canonical-artifact.zip'
-          $dir = Join-Path $env:RUNNER_TEMP 'canonical-artifact'
-          $headers = @{
-            Authorization = "Bearer $env:GH_TOKEN"
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          }
-          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
-          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
-          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
-          $matches = @($listing.artifacts | Where-Object {
-            -not $_.expired -and
-            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
-            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
-          })
-          if ($matches.Count -ne 1) {
-            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
-          }
-          $artifact = $matches[0]
-          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip -MaximumRedirection 8
-          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
-          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
-          Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
-          $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
-          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
-          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          try {
-            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
-            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
-            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
-            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
-            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
-            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
-            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
-          }
-          finally {
-            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          }
-          New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist') | Out-Null
-          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist')
+          if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX extensions
         shell: pwsh
@@ -404,7 +319,7 @@ jobs:
           foreach ($shortcut in $desktopCandidates) { if (Test-Path -LiteralPath $shortcut) { Remove-Item -LiteralPath $shortcut -Force } }
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart','CreateDesktopShortcut=1','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "INSTALL_FAILED=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "INSTALL_FAILED=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'INSTALLED_EXE_MISSING' }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
           if ($hash -ne $env:EXPECTED_BRIDGEX_SHA256) { throw "INSTALLED_EXE_HASH_FAIL=$hash" }
@@ -415,7 +330,7 @@ jobs:
           Write-Host "RUNNING_BRIDGEX_PRECONDITION=PASS pid=$($app.Id)"
 
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "UNINSTALL_FAILED=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "UNINSTALL_FAILED=$($uninstall.ExitCode)" }
           Start-Sleep -Seconds 1
           $app.Refresh()
           if (-not $app.HasExited) { throw "BRIDGEX_PROCESS_STILL_RUNNING_AFTER_UNINSTALL pid=$($app.Id)" }
@@ -446,14 +361,14 @@ jobs:
           $exe = Join-Path $root 'bin\BridgeX.exe'
           New-Item -ItemType Directory -Force -Path $base | Out-Null
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "CUSTOM_INSTALL_FAILED=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "CUSTOM_INSTALL_FAILED=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw "CUSTOM_LOCATION_MISSING=$exe" }
           if (Test-Path -LiteralPath (Join-Path $env:ProgramFiles 'TNSuite\BridgeX\bin\BridgeX.exe')) { throw 'CUSTOM_LOCATION_FELL_BACK_TO_C' }
           $app = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
           Start-Sleep -Seconds 3
           if ($app.HasExited) { throw 'CUSTOM_RUNTIME_PRECONDITION_FAIL' }
           $uninstall = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
-          if ($uninstall.ExitCode -notin @(0,3010)) { throw "CUSTOM_UNINSTALL_FAILED=$($uninstall.ExitCode)" }
+          if ($uninstall.ExitCode -ne 0) { throw "CUSTOM_UNINSTALL_FAILED=$($uninstall.ExitCode)" }
           $app.Refresh()
           if (-not $app.HasExited) { throw 'CUSTOM_RUNNING_APP_NOT_CLOSED' }
           if (Test-Path -LiteralPath $exe) { throw 'CUSTOM_MANAGED_EXE_REMAINS' }
@@ -474,64 +389,22 @@ jobs:
   hotfix23-installer:
     runs-on: windows-latest
     env:
-      CANONICAL_SOURCE_SHA: ${{ github.event.pull_request.base.sha }}
-      CANONICAL_ARTIFACT_NAME: bridgex-release-${{ github.event.pull_request.base.sha }}
       WIX_VERSION: '6.0.0'
 
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Download canonical runtime payload
+      - name: Fetch SHA256-verified RC1 payload for historical installer QA
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $zip = Join-Path $env:RUNNER_TEMP 'canonical-artifact.zip'
-          $dir = Join-Path $env:RUNNER_TEMP 'canonical-artifact'
-          $headers = @{
-            Authorization = "Bearer $env:GH_TOKEN"
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          }
-          $escapedName = [uri]::EscapeDataString($env:CANONICAL_ARTIFACT_NAME)
-          $lookupUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$escapedName&per_page=100"
-          $listing = Invoke-RestMethod -Headers $headers -Uri $lookupUri
-          $matches = @($listing.artifacts | Where-Object {
-            -not $_.expired -and
-            $_.name -eq $env:CANONICAL_ARTIFACT_NAME -and
-            $_.workflow_run.head_sha -eq $env:CANONICAL_SOURCE_SHA
-          })
-          if ($matches.Count -ne 1) {
-            throw "CANONICAL_ARTIFACT_RESOLUTION_FAIL name=$env:CANONICAL_ARTIFACT_NAME source=$env:CANONICAL_SOURCE_SHA matches=$($matches.Count)"
-          }
-          $artifact = $matches[0]
-          Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zip -MaximumRedirection 8
-          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-          Write-Host "CANONICAL_ARTIFACT_ID=$($artifact.id)"
-          Write-Host "CANONICAL_ARTIFACT_NAME=$($artifact.name)"
-          Write-Host "CANONICAL_ARTIFACT_SOURCE_SHA=$env:CANONICAL_SOURCE_SHA"
-          $portable = Join-Path $dir 'release-assets\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip'
-          if (-not (Test-Path -LiteralPath $portable)) { throw "CANONICAL_PORTABLE_MISSING=$portable" }
-          $runtimeProbe = Join-Path $env:RUNNER_TEMP 'bridgex-canonical-runtime-probe'
-          if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          try {
-            Expand-Archive -LiteralPath $portable -DestinationPath $runtimeProbe -Force
-            $canonicalExe = Join-Path $runtimeProbe 'bin\BridgeX.exe'
-            if (-not (Test-Path -LiteralPath $canonicalExe -PathType Leaf)) { throw "CANONICAL_BRIDGEX_EXE_MISSING=$canonicalExe" }
-            $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $canonicalExe).Hash.ToLowerInvariant()
-            if ($runtimeSha -notmatch '^[0-9a-f]{64}$') { throw "CANONICAL_RUNTIME_SHA256_INVALID=$runtimeSha" }
-            "EXPECTED_BRIDGEX_SHA256=$runtimeSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            Write-Host "CANONICAL_RUNTIME_SHA256=$runtimeSha"
-            Write-Host 'CANONICAL_RUNTIME_HASH_AUTHORITY=EXACT_BASE_ARTIFACT'
-          }
-          finally {
-            if (Test-Path -LiteralPath $runtimeProbe) { Remove-Item -LiteralPath $runtimeProbe -Recurse -Force }
-          }
-          New-Item -ItemType Directory -Force -Path (Join-Path $PWD 'dist'), (Join-Path $PWD 'dist-prev') | Out-Null
-          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
-          Copy-Item -LiteralPath $portable -Destination (Join-Path $PWD 'dist-prev\TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full.zip') -Force
+          & .\qa\fetch_pinned_rc1_qa_runtime.ps1 -OutputDirectories @('dist','dist-prev')
+          if ($LASTEXITCODE -ne 0) { throw "LEGACY_QA_RUNTIME_FETCH_FAILED=$LASTEXITCODE" }
 
       - name: Install pinned WiX extensions
         shell: pwsh
@@ -580,7 +453,7 @@ jobs:
             'EXISTING_INSTALL_PATH_COMPONENT={492A8EAC-6707-51E3-9723-967A6E4A94D9}',
             'PRE_INSTALLVALIDATE_AUTO_CLOSE_BRIDGEX=ENABLED',
             'AUTO_CLOSE_TARGETS=BridgeX.exe,BridgeX-CLI.exe',
-            'RESTART_MANAGER=DISABLED',
+            'RESTART_MANAGER=ENABLED',
             'INSTALL_BASE_MIGRATION=MSI_COMPONENT_DIRECTORY'
           )) {
             if (-not $qaText.Contains($marker)) { throw "HOTFIX23_BUILD_MARKER_MISSING=$marker" }
@@ -632,7 +505,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "HOTFIX22_INSTALL_FAILED=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "HOTFIX22_INSTALL_FAILED=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HOTFIX22_CUSTOM_LOCATION_MISSING' }
           if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'HOTFIX22_CUSTOM_LOCATION_PRECONDITION_FELL_BACK_TO_C' }
 
@@ -746,56 +619,22 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Prepare disposable Hotfix24 runtime build hooks
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildPath = '.\scripts\build-filezilla-dark.sh'
-          $build = Get-Content -LiteralPath $buildPath -Raw -Encoding UTF8
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\prepare-hotfix24-build-hooks.ps1
+          if ($LASTEXITCODE -ne 0) { throw "HF24_DISPOSABLE_PREPARE_FAILED=$LASTEXITCODE" }
 
-          # The old BuildKit checked three large design/reference exports that were
-          # deliberately removed from canonical source. Match the governed release
-          # adapter: validate the current shipped branding contract instead.
-          $brandingOld = @'
-          log "Branding/UI asset QA - fail closed"
-          python "$QA/branding_asset_check.py" "$KIT" | tee "$WORK/branding-asset-report.txt"
-          grep -q '^BRANDING_ASSET_QA=PASS$' "$WORK/branding-asset-report.txt"
-          '@
-          $brandingNew = @'
-          log "Canonical branding contract QA - fail closed"
-          python "$KIT/scripts/qa/branding_contract_check.py" "$KIT" | tee "$WORK/branding-contract-report.txt"
-          grep -q '^BRANDING_CONTRACT_QA=PASS$' "$WORK/branding-contract-report.txt"
-          '@
-          $brandingOld = $brandingOld -replace "`r`n", "`n"
-          $brandingNew = $brandingNew -replace "`r`n", "`n"
-          if (-not $build.Contains($brandingOld.Trim())) { throw 'HF24_BRANDING_CONTRACT_ADAPTER_ANCHOR_MISSING' }
-          $build = $build.Replace($brandingOld.Trim(), $brandingNew.Trim())
-
-          $patchNeedle = 'python "$KIT/scripts/patch_tnsuite_bridgex.py" "$SRC"'
-          $patchReplacement = $patchNeedle + "`n" + 'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"'
-          if (-not $build.Contains($patchNeedle)) { throw 'HF24_RUNTIME_PATCH_HOOK_ANCHOR_MISSING' }
-          $build = $build.Replace($patchNeedle, $patchReplacement)
-
-          $exeNeedle = '[[ -s "$APP/bin/BridgeX.exe" ]] || { echo "ERROR: BridgeX.exe branding rename failed." >&2; exit 36; }'
-          $exeReplacement = $exeNeedle + "`n" + @'
-          BRIDGEX_APP_ICON_SOURCE="$KIT/assets/branding/BridgeX-AppIcon.ico"
-          BRIDGEX_APP_ICON_RUNTIME="$APP/bin/BridgeX-AppIcon.ico"
-          cp -f "$BRIDGEX_APP_ICON_SOURCE" "$BRIDGEX_APP_ICON_RUNTIME"
-          [[ -s "$BRIDGEX_APP_ICON_RUNTIME" ]] || { echo "ERROR: BridgeX runtime icon missing." >&2; exit 47; }
-          [[ "$(sha256sum "$BRIDGEX_APP_ICON_SOURCE" | awk '{print $1}')" == "$(sha256sum "$BRIDGEX_APP_ICON_RUNTIME" | awk '{print $1}')" ]] || { echo "ERROR: BridgeX runtime icon hash mismatch." >&2; exit 48; }
-          echo "BRIDGEX_APP_ICON_RUNTIME_QA=PASS"
-          '@
-          if (-not $build.Contains($exeNeedle)) { throw 'HF24_RUNTIME_ICON_PACKAGE_ANCHOR_MISSING' }
-          $build = $build.Replace($exeNeedle, $exeReplacement)
-          [IO.File]::WriteAllText((Resolve-Path $buildPath), $build, [Text.UTF8Encoding]::new($false))
-
-          $icon = '.\assets\branding\BridgeX-AppIcon.ico'
-          $sidebar = '.\installer\BridgeX-Setup-Sidebar.bmp'
-          if ((Get-FileHash -Algorithm SHA256 $icon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_CANONICAL_ICON_HASH_FAIL' }
-          if ((Get-FileHash -Algorithm SHA256 $sidebar).Hash.ToLowerInvariant() -ne $env:SIDEBAR_SHA256) { throw 'HF24_CLASSIC_SIDEBAR_HASH_FAIL' }
-          Write-Host 'HF24_BUILD_HOOKS=PASS'
-          Write-Host 'HF24_CANONICAL_BRANDING_ASSETS=PASS'
+      - name: Fetch exact MSYS2 build bootstrap from official pinned mirror
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\prefetch_pinned_msys2.ps1
+          if ($LASTEXITCODE -ne 0) { throw "PINNED_MSYS2_PREFETCH_FAILED=$LASTEXITCODE" }
 
       - name: Build full BridgeX Windows runtime from source
         shell: pwsh
@@ -816,6 +655,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $runtimeExe)) { throw 'HF24_PORTABLE_RUNTIME_MISSING' }
           if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF24_PORTABLE_ICON_MISSING' }
           if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_PORTABLE_ICON_HASH_FAIL' }
+          & python.exe .\qa\verify_hotfix25_runtime_binary.py $runtimeExe
+          if ($LASTEXITCODE -ne 0) { throw 'HF25_NATIVE_COMPILED_ABOUT_VERSION_FAIL' }
 
           # The native source build is not bit-reproducible across independent CI
           # runs. Capture the exact runtime SHA here, before packaging, and pass it
@@ -893,7 +734,7 @@ jobs:
           $runtimeIcon = Join-Path $root 'bin\BridgeX-AppIcon.ico'
           if (Test-Path $base) { Remove-Item $base -Recurse -Force }
           $install = Start-Process -FilePath $setup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "HF24_INSTALL_FAIL=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "HF24_INSTALL_FAIL=$($install.ExitCode)" }
           if (-not (Test-Path $exe) -or -not (Test-Path $runtimeIcon)) { throw 'HF24_RUNTIME_ICON_PAYLOAD_MISSING' }
           if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_INSTALLED_ICON_HASH_FAIL' }
 
@@ -966,7 +807,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $base | Out-Null
 
           $oldInstall = Start-Process -FilePath $oldSetup -ArgumentList @('/quiet','/norestart',("InstallFolder={0}" -f $base),'CreateDesktopShortcut=0','LaunchAfterInstall=0') -Wait -PassThru
-          if ($oldInstall.ExitCode -notin @(0,3010)) { throw "HF24_PREVIOUS_INSTALL_FAILED=$($oldInstall.ExitCode)" }
+          if ($oldInstall.ExitCode -ne 0) { throw "HF24_PREVIOUS_INSTALL_FAILED=$($oldInstall.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HF24_PREVIOUS_CUSTOM_LOCATION_MISSING' }
           if (Test-Path -LiteralPath (Join-Path $defaultRoot 'bin\BridgeX.exe')) { throw 'HF24_PREVIOUS_CUSTOM_LOCATION_FELL_BACK_TO_C' }
 
@@ -1028,6 +869,106 @@ jobs:
           Write-Host 'HF24_REBOOT_REQUIRED=NO'
           Write-Host 'HF24_EXACT_CANDIDATE_MAINTENANCE_ACCEPTANCE=PASS'
 
+
+      # Source-derived Hotfix25 (PR QA only). Build from the same portable and
+      # exact runtime bytes just compiled and accepted by the Hotfix24 job.
+      # This closes the PR test provenance gap without touching public RC1.
+      - name: Build exact PR-source Hotfix25 and record artifact hash chain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expectedHead = '${{ github.event.pull_request.head.sha }}'
+          $actualHead = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actualHead -ne $expectedHead) {
+            throw "HF25_EXACT_PR_SOURCE_MISMATCH expected=$expectedHead actual=$actualHead"
+          }
+          $expectedRuntime = $env:HF24_RUNTIME_SHA256
+          if ($expectedRuntime -notmatch '^[a-f0-9]{64}$') { throw 'HF25_EXACT_RUNTIME_HASH_NOT_AVAILABLE' }
+          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          if (-not (Test-Path -LiteralPath $portable)) { throw 'HF25_EXACT_PORTABLE_NOT_FOUND' }
+          $portableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $portable).Hash.ToLowerInvariant()
+          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-HF25-SourceHashProbe'
+          if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Recurse -Force }
+          Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+          $exe = Join-Path $probe 'bin\BridgeX.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw 'HF25_EXACT_SOURCE_RUNTIME_MISSING' }
+          $runtimeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+          if ($runtimeHash -ne $expectedRuntime) {
+            throw "HF25_EXACT_RUNTIME_CHAIN_MISMATCH expected=$expectedRuntime actual=$runtimeHash"
+          }
+          $out = Join-Path $PWD 'dist-hf25-source'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $qa = Join-Path $out 'BridgeX-Hotfix25-Source-Build-QA.txt'
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix25.ps1 -PortableZip $portable -OutputDirectory $out -ExpectedBridgeXSha256 $runtimeHash 2>&1 | Tee-Object -FilePath $qa
+          if ($LASTEXITCODE -ne 0) { throw "HF25_EXACT_SOURCE_PACKAGING_FAILED=$LASTEXITCODE" }
+          $msi = Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi'
+          $setup = Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          foreach ($file in @($msi, $setup)) {
+            if (-not (Test-Path -LiteralPath $file)) { throw "HF25_EXACT_SOURCE_ARTIFACT_MISSING=$file" }
+          }
+          $msiHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $msi).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+          $manifest = Join-Path $out 'BridgeX-Hotfix25-PR-Source-HashChain.txt'
+          @(
+            'ARTIFACT_CLASS=PR_TEST_ONLY'
+            'RELEASE_PROMOTION_AUTHORITY=NONE'
+            "SOURCE_SHA=$actualHead"
+            "PORTABLE_ZIP_SHA256=$portableHash"
+            "RUNTIME_BRIDGEX_EXE_SHA256=$runtimeHash"
+            "MSI_SHA256=$msiHash"
+            "SETUP_EXE_SHA256=$setupHash"
+            'SOURCE_RUNTIME_MSI_SETUP_CHAIN_QA=PASS'
+            'WINDOWS_E2E=NOT_YET_VERIFIED'
+          ) | Set-Content -LiteralPath $manifest -Encoding utf8
+          Write-Host "HF25_PR_SOURCE_SHA=$actualHead"
+          Write-Host "HF25_PR_RUNTIME_SHA256=$runtimeHash"
+          Write-Host "HF25_PR_MSI_SHA256=$msiHash"
+          Write-Host "HF25_PR_SETUP_SHA256=$setupHash"
+          Write-Host 'HF25_PR_SOURCE_ARTIFACT_HASH_CHAIN=PASS_QA_ONLY'
+
+      - name: Windows E2E for source-derived Hotfix25
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          $setup = Join-Path $PWD 'dist-hf25-source\TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip $portable -Hotfix25Setup $setup -ExpectedBridgeXSha256 $env:HF24_RUNTIME_SHA256
+          if ($LASTEXITCODE -ne 0) { throw "HF25_PR_SOURCE_WINDOWS_E2E_FAILED=$LASTEXITCODE" }
+          $manifest = Join-Path $PWD 'dist-hf25-source\BridgeX-Hotfix25-PR-Source-HashChain.txt'
+          if (-not (Test-Path -LiteralPath $manifest)) { throw 'HF25_PR_SOURCE_HASH_MANIFEST_MISSING' }
+          $manifestText = Get-Content -LiteralPath $manifest -Raw -Encoding utf8
+          if (([regex]::Matches($manifestText, [regex]::Escape('WINDOWS_E2E=NOT_YET_VERIFIED'))).Count -ne 1) {
+            throw 'HF25_PR_SOURCE_E2E_MANIFEST_STATE_INVALID'
+          }
+          $manifestText = $manifestText.Replace('WINDOWS_E2E=NOT_YET_VERIFIED', 'WINDOWS_E2E=PASS')
+          [IO.File]::WriteAllText($manifest, $manifestText, [Text.UTF8Encoding]::new($false))
+          Write-Host 'HF25_PR_SOURCE_TO_WINDOWS_E2E=PASS_QA_ONLY'
+
+      - name: Upload source-derived Hotfix25 Windows logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-source-hotfix25-windows-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/**/*.log
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/windows-qa-failure-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload source-derived Hotfix25 QA candidate
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-source-hotfix25-${{ github.event.pull_request.head.sha }}
+          path: |
+            dist/TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip
+            dist-hf25-source/TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe
+            dist-hf25-source/TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi
+            dist-hf25-source/BridgeX-Hotfix25-Source-Build-QA.txt
+            dist-hf25-source/BridgeX-Hotfix25-PR-Source-HashChain.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload Hotfix24 candidate
         if: always()
         uses: actions/upload-artifact@v4
@@ -1052,78 +993,53 @@ jobs:
     steps:
       - name: Checkout PR source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Prepare Hotfix25 disposable runtime hooks
+      # Installer-only regression QA reuses a pinned, already-published runtime.
+      # It is NOT an exact-main compile, release candidate, or publication authority.
+      # Public RC1 bytes remain immutable; the newly built MSI/Bundle is test-only.
+      - name: Prepare exact-hash RC1 portable for installer-only QA
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $buildPath = '.\scripts\build-filezilla-dark.sh'
-          $build = Get-Content -LiteralPath $buildPath -Raw -Encoding UTF8
+          $tag = 'v0.5.0-build12-hotfix25-rc1'
+          $asset = 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-Portable.zip'
+          $expectedPortableHash = '1a2a752e21d8e698c0d1fe7839f94bfc2c0012451ba10a4b111d9bb8045d9299'
+          $expectedRuntimeHash = '5ec55edad4b44dec1e9419776d9b892384c008458fc8f96c3183df8e41e4a640'
+          $dist = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Path $dist -Force | Out-Null
 
-          $brandingOld = @'
-          log "Branding/UI asset QA - fail closed"
-          python "$QA/branding_asset_check.py" "$KIT" | tee "$WORK/branding-asset-report.txt"
-          grep -q '^BRANDING_ASSET_QA=PASS$' "$WORK/branding-asset-report.txt"
-          '@
-          $brandingNew = @'
-          log "Canonical branding contract QA - fail closed"
-          python "$KIT/scripts/qa/branding_contract_check.py" "$KIT" | tee "$WORK/branding-contract-report.txt"
-          grep -q '^BRANDING_CONTRACT_QA=PASS$' "$WORK/branding-contract-report.txt"
-          '@
-          $brandingOld = $brandingOld -replace "`r`n", "`n"
-          $brandingNew = $brandingNew -replace "`r`n", "`n"
-          if (-not $build.Contains($brandingOld.Trim())) { throw 'HF25_BRANDING_CONTRACT_ADAPTER_ANCHOR_MISSING' }
-          $build = $build.Replace($brandingOld.Trim(), $brandingNew.Trim())
+          & gh release download $tag -R $env:GITHUB_REPOSITORY -p $asset -D $dist --clobber
+          if ($LASTEXITCODE -ne 0) { throw "HF25_PINNED_PORTABLE_DOWNLOAD_FAILED=$LASTEXITCODE" }
+          $downloaded = Join-Path $dist $asset
+          if (-not (Test-Path -LiteralPath $downloaded -PathType Leaf)) { throw 'HF25_PINNED_PORTABLE_MISSING' }
+          $actualPortableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $downloaded).Hash.ToLowerInvariant()
+          if ($actualPortableHash -ne $expectedPortableHash) { throw "HF25_PINNED_PORTABLE_HASH_FAIL actual=$actualPortableHash" }
 
-          $patchNeedle = 'python "$KIT/scripts/patch_tnsuite_bridgex.py" "$SRC"'
-          $patchReplacement = $patchNeedle + "`n" +
-            'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"' + "`n" +
-            'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix25.py" "$SRC"'
-          if (-not $build.Contains($patchNeedle)) { throw 'HF25_RUNTIME_PATCH_HOOK_ANCHOR_MISSING' }
-          $build = $build.Replace($patchNeedle, $patchReplacement)
-
-          $exeNeedle = '[[ -s "$APP/bin/BridgeX.exe" ]] || { echo "ERROR: BridgeX.exe branding rename failed." >&2; exit 36; }'
-          $exeReplacement = $exeNeedle + "`n" + @'
-          BRIDGEX_APP_ICON_SOURCE="$KIT/assets/branding/BridgeX-AppIcon.ico"
-          BRIDGEX_APP_ICON_RUNTIME="$APP/bin/BridgeX-AppIcon.ico"
-          cp -f "$BRIDGEX_APP_ICON_SOURCE" "$BRIDGEX_APP_ICON_RUNTIME"
-          [[ -s "$BRIDGEX_APP_ICON_RUNTIME" ]] || { echo "ERROR: BridgeX runtime icon missing." >&2; exit 47; }
-          [[ "$(sha256sum "$BRIDGEX_APP_ICON_SOURCE" | awk '{print $1}')" == "$(sha256sum "$BRIDGEX_APP_ICON_RUNTIME" | awk '{print $1}')" ]] || { echo "ERROR: BridgeX runtime icon hash mismatch." >&2; exit 48; }
-          echo "BRIDGEX_APP_ICON_RUNTIME_QA=PASS"
-          '@
-          if (-not $build.Contains($exeNeedle)) { throw 'HF25_RUNTIME_ICON_PACKAGE_ANCHOR_MISSING' }
-          $build = $build.Replace($exeNeedle, $exeReplacement)
-          [IO.File]::WriteAllText((Resolve-Path $buildPath), $build, [Text.UTF8Encoding]::new($false))
-
-          if ((Get-FileHash -Algorithm SHA256 '.\assets\branding\BridgeX-AppIcon.ico').Hash.ToLowerInvariant() -ne $env:ICON_SHA256) {
-            throw 'HF25_CANONICAL_ICON_HASH_FAIL'
-          }
-          Write-Host 'HF25_BUILD_HOOKS=PASS'
-
-      - name: Build full Hotfix25 Windows runtime
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Build-TNSuiteBridgeX.ps1
-          if ($LASTEXITCODE -ne 0) { throw "HF25_FULL_RUNTIME_BUILD_FAILED=$LASTEXITCODE" }
-
-          $portable = Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
-          if (-not (Test-Path -LiteralPath $portable)) { throw "HF25_PORTABLE_MISSING=$portable" }
-
-          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix25-PortableProbe'
-          if (Test-Path $probe) { Remove-Item $probe -Recurse -Force }
+          $portable = Join-Path $dist "$env:BUILD16_NAME.zip"
+          Copy-Item -LiteralPath $downloaded -Destination $portable -Force
+          $probe = Join-Path $env:RUNNER_TEMP 'BridgeX-Hotfix25-PinnedPortable'
+          if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe -Recurse -Force }
           Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+
           $runtimeExe = Join-Path $probe 'bin\BridgeX.exe'
           $runtimeIcon = Join-Path $probe 'bin\BridgeX-AppIcon.ico'
-          if (-not (Test-Path -LiteralPath $runtimeExe)) { throw 'HF25_PORTABLE_RUNTIME_MISSING' }
-          if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF25_PORTABLE_ICON_MISSING' }
-          if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF25_PORTABLE_ICON_HASH_FAIL' }
+          if (-not (Test-Path -LiteralPath $runtimeExe -PathType Leaf)) { throw 'HF25_PINNED_RUNTIME_MISSING' }
+          if (-not (Test-Path -LiteralPath $runtimeIcon -PathType Leaf)) { throw 'HF25_PINNED_ICON_MISSING' }
+          $runtimeSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeExe).Hash.ToLowerInvariant()
+          $iconSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeIcon).Hash.ToLowerInvariant()
+          if ($runtimeSha -ne $expectedRuntimeHash) { throw "HF25_PINNED_RUNTIME_HASH_FAIL actual=$runtimeSha" }
+          if ($iconSha -ne $env:ICON_SHA256) { throw "HF25_PINNED_ICON_HASH_FAIL actual=$iconSha" }
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "HF25_RUNTIME_SHA256=$runtimeSha`n", [Text.UTF8Encoding]::new($false))
 
-          $runtimeSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeExe).Hash.ToLowerInvariant()
-          if ($runtimeSha256 -notmatch '^[0-9a-f]{64}$') { throw "HF25_RUNTIME_SHA256_INVALID=$runtimeSha256" }
-          [IO.File]::AppendAllText($env:GITHUB_ENV, "HF25_RUNTIME_SHA256=$runtimeSha256`n", [Text.UTF8Encoding]::new($false))
-          Write-Host "HF25_RUNTIME_SHA256=$runtimeSha256"
-          Write-Host 'HF25_WINDOWS_COMPILE_QA=PASS'
+          Write-Host "HF25_PINNED_PORTABLE_SHA256=$actualPortableHash"
+          Write-Host "HF25_PINNED_RUNTIME_SHA256=$runtimeSha"
+          Write-Host 'HF25_RUNTIME_PROVENANCE=PUBLIC_RC1_EXACT_HASH_QA_ONLY'
+          Write-Host 'HF25_WINDOWS_COMPILE_QA=NOT_PERFORMED_BY_THIS_JOB'
+          Write-Host 'HF25_TEST_ONLY_BUILD_NOT_ELIGIBLE_FOR_PROMOTION=YES'
 
       - name: Install pinned WiX extensions
         shell: pwsh
@@ -1181,7 +1097,7 @@ jobs:
             '/quiet','/norestart',("InstallFolder={0}" -f $base),
             'CreateDesktopShortcut=0','LaunchAfterInstall=0'
           ) -Wait -PassThru
-          if ($install.ExitCode -notin @(0,3010)) { throw "HF25_INSTALL_FAIL=$($install.ExitCode)" }
+          if ($install.ExitCode -ne 0) { throw "HF25_INSTALL_FAIL=$($install.ExitCode)" }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'HF25_INSTALLED_EXE_MISSING' }
 
           Add-Type @'
@@ -1272,6 +1188,24 @@ jobs:
 
           $remove = Start-Process -FilePath $setup -ArgumentList @('/uninstall','/quiet','/norestart') -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw "HF25_UNINSTALL_FAIL=$($remove.ExitCode)" }
+
+      - name: No-reboot Windows QA (fresh with running legacy app, upgrade, repair, uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip (Join-Path $PWD "dist\$env:BUILD16_NAME.zip") -Hotfix25Setup (Join-Path $PWD "dist-hf25\$env:HF25_SETUP_NAME") -ExpectedBridgeXSha256 $env:HF25_RUNTIME_SHA256
+          if ($LASTEXITCODE -ne 0) { throw "HF25_NO_REBOOT_WINDOWS_QA_FAILED=$LASTEXITCODE" }
+
+      - name: Upload Hotfix25 Windows E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridgex-hotfix25-windows-e2e-logs-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/**/*.log
+            ${{ runner.temp }}/BridgeX-NoReboot-QA/windows-qa-failure-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload Hotfix25 candidate
         if: always()

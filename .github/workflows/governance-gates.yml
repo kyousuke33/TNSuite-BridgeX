@@ -184,7 +184,7 @@ jobs:
           PUBLICATION_PAUSED=YES
           \`\`\`
 
-          The artifact above is the only Build12-Hotfix17 candidate eligible for SHA-256 / VirusTotal verification and later governed promotion. PR dry-run artifacts use the separate `bridgex-pr-test-<sha>` family, expire after 2 days, and are not promotion authority.
+          The artifact above is the only Build12-Hotfix25 unsigned RC2 candidate eligible for SHA-256 / VirusTotal verification and later governed promotion. PR dry-run artifacts use the separate `bridgex-pr-test-<sha>` family, expire after 2 days, and are not promotion authority.
           EOF
           gh issue comment 18 --repo "$GITHUB_REPOSITORY" --body-file /tmp/bridgex-main-artifact.md
           echo "CANONICAL_MAIN_ARTIFACT_REPORTED=${artifact_name}"

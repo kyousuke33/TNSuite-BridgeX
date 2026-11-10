@@ -19,6 +19,12 @@ on:
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      BUILD16_NAME: 'TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full'
+      WIX_VERSION: '6.0.0'
+      ICON_SHA256: '06266307acb6a92aca9742dac59dd053029075256a30eec50a37a71e08296328'
+      SIDEBAR_SHA256: 'a54496bf465f8bc7e71269ad48b6c10e995656051c6c39a0c820ee0d30343de2'
 
     steps:
       - name: Checkout exact source SHA
@@ -33,10 +39,13 @@ jobs:
           $request = Get-Content '.release/release-request.json' -Raw | ConvertFrom-Json
           if ($request.schema -ne 'tnsuite.bridgex.release-request.v1') { throw 'RELEASE_REQUEST_SCHEMA_INVALID' }
           if ($request.channel -ne 'github-releases') { throw 'RELEASE_CHANNEL_INVALID' }
-          if ($request.tag -ne 'v0.5-Build12-Hotfix17') { throw 'RELEASE_TAG_INVALID' }
-          if ($request.build_name -ne 'TNSuiteBridgeX_260820_v0.5-Build12-Hotfix17-Full') { throw 'BUILD_NAME_INVALID' }
+          if ($request.tag -ne 'v0.5.0-build12-hotfix25-rc2') { throw 'RELEASE_TAG_INVALID' }
+          if ($request.build_name -ne 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX') { throw 'BUILD_NAME_INVALID' }
           if ($request.rcp_profile -ne 'tnsuite.public-desktop-github-release.v1') { throw 'RCP_RELEASE_PROFILE_INVALID' }
           if ($request.rcp_authority_sha -notmatch '^[0-9a-f]{40}$') { throw 'RCP_AUTHORITY_SHA_INVALID' }
+          if ($request.manual_download_only -ne $true -or $request.authenticode_required -ne $false -or $request.auto_update_enabled -ne $false -or $request.release_status -ne 'prerelease') {
+            throw 'UNSIGNED_MANUAL_RELEASE_POLICY_INVALID'
+          }
 
           $sourceSha = '${{ inputs.source_sha }}'
           $callerSha = '${{ github.sha }}'
@@ -50,7 +59,7 @@ jobs:
           "RCP_RELEASE_PROFILE=$($request.rcp_profile)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "RCP_AUTHORITY_SHA=$($request.rcp_authority_sha)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "BRIDGEX_SOURCE_SHA=$sourceSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host 'REMEDIATION_RELEASE_IDENTITY=Build12-Hotfix17'
+          Write-Host 'REMEDIATION_RELEASE_IDENTITY=Build12-Hotfix25_UNSIGNED_MANUAL_RC2'
           Write-Host 'WITHDRAWN_HOTFIX16_IDENTITY_REUSED=NO'
 
       - name: Determine execution and artifact policy
@@ -97,102 +106,153 @@ jobs:
           Write-Host "BRIDGEX_PROMOTION_AUTHORITY=$promotionAuthority"
           Write-Host 'PUBLICATION_PAUSED=YES'
 
-      - name: Build Windows installer and portable archive
-        if: steps.plan.outputs.build == 'true'
+      - name: Prepare exact Hotfix24 source-build hooks
         shell: pwsh
         run: |
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\.release\windows-build-adapter.ps1
-          if ($LASTEXITCODE -ne 0) { throw "WINDOWS_BUILD_FAILED=$LASTEXITCODE" }
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\prepare-hotfix24-build-hooks.ps1
+          if ($LASTEXITCODE -ne 0) { throw "SOURCE_BUILD_HOOKS_FAILED=$LASTEXITCODE" }
+
+      - name: Fetch exact MSYS2 build bootstrap from official pinned mirror
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\prefetch_pinned_msys2.ps1
+          if ($LASTEXITCODE -ne 0) { throw "PINNED_MSYS2_PREFETCH_FAILED=$LASTEXITCODE" }
+
+      - name: Build runtime from exact source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Build-TNSuiteBridgeX.ps1
+          if ($LASTEXITCODE -ne 0) { throw "SOURCE_COMPILE_FAILED=$LASTEXITCODE" }
+          $portable=Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          if(-not (Test-Path -LiteralPath $portable)){throw 'SOURCE_PORTABLE_MISSING'}
+          $probe=Join-Path $env:RUNNER_TEMP 'BridgeX-HF25-Release-Probe'
+          if(Test-Path $probe){Remove-Item $probe -Recurse -Force}
+          Expand-Archive -LiteralPath $portable -DestinationPath $probe -Force
+          $exe=Join-Path $probe 'bin\BridgeX.exe'
+          $icon=Join-Path $probe 'bin\BridgeX-AppIcon.ico'
+          if(-not (Test-Path -LiteralPath $exe)){throw 'SOURCE_RUNTIME_EXE_MISSING'}
+          if(-not (Test-Path -LiteralPath $icon)){throw 'SOURCE_RUNTIME_ICON_MISSING'}
+          if((Get-FileHash -Algorithm SHA256 $icon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256){throw 'SOURCE_RUNTIME_ICON_HASH_FAIL'}
+          & python.exe .\qa\verify_hotfix25_runtime_binary.py $exe
+          if($LASTEXITCODE -ne 0){throw 'HF25_RELEASE_COMPILED_ABOUT_VERSION_FAIL'}
+          $sha=(Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
+          if($sha -notmatch '^[a-f0-9]{64}$'){throw 'SOURCE_RUNTIME_SHA256_INVALID'}
+          [IO.File]::AppendAllText($env:GITHUB_ENV,"BRIDGEX_RUNTIME_SHA256=$sha"+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+          Write-Host "RUNTIME_EXE_SHA256=$sha"
           Write-Host 'WINDOWS_COMPILE_QA=PASS'
+
+      - name: Install pinned WiX Toolset and extensions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install --global wix --version $env:WIX_VERSION
+          if($LASTEXITCODE -ne 0){throw 'WIX_TOOL_INSTALL_FAILED'}
+          wix extension add -g "WixToolset.BootstrapperApplications.wixext/$env:WIX_VERSION"
+          if($LASTEXITCODE -ne 0){throw 'WIX_BA_EXTENSION_FAILED'}
+          wix extension add -g "WixToolset.Util.wixext/$env:WIX_VERSION"
+          if($LASTEXITCODE -ne 0){throw 'WIX_UTIL_EXTENSION_FAILED'}
+          wix --version
+          if($LASTEXITCODE -ne 0){throw 'WIX_VERSION_FAILED'}
+
+      - name: Package exact Hotfix25 WiX installer and validate Windows E2E
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portable=Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          $out=Join-Path $PWD 'dist-hf25-source'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          & pwsh.exe -NoLogo -NoProfile -File .\.release\build-wix-installer-hotfix25.ps1 -PortableZip $portable -OutputDirectory $out -ExpectedBridgeXSha256 $env:BRIDGEX_RUNTIME_SHA256
+          if($LASTEXITCODE -ne 0){throw 'HOTFIX25_WIX_PACKAGE_FAILED'}
+          $setup=Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          $msi=Join-Path $out 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi'
+          foreach($f in @($setup,$msi)){if(-not (Test-Path -LiteralPath $f)){throw "HOTFIX25_OUTPUT_MISSING=$f"}}
+          $ver=(Get-Item -LiteralPath $setup).VersionInfo.FileVersion
+          if($ver -ne '0.5.12.25'){throw "HOTFIX25_SETUP_FILE_VERSION_FAIL=$ver"}
+          & pwsh.exe -NoLogo -NoProfile -File .\qa\hotfix25_no_reboot_windows.ps1 -PortableZip $portable -Hotfix25Setup $setup -ExpectedBridgeXSha256 $env:BRIDGEX_RUNTIME_SHA256
+          if($LASTEXITCODE -ne 0){throw 'HOTFIX25_WINDOWS_E2E_FAILED'}
+          Write-Host 'HOTFIX25_SOURCE_WINDOWS_E2E=PASS'
           Write-Host 'INSTALLER_BUILD_QA=PASS'
           Write-Host 'PORTABLE_BUILD_QA=PASS'
 
-      - name: Prepare build evidence assets
-        if: steps.plan.outputs.build == 'true'
+      - name: Prepare unsigned manual-release evidence assets
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $assets = Join-Path $PWD 'release-assets'
-          New-Item -ItemType Directory -Force -Path $assets | Out-Null
-
-          $setup = Join-Path $PWD "dist\$env:BUILD_NAME-Setup.exe"
-          $portable = Join-Path $PWD "dist\$env:BUILD_NAME.zip"
-          if (-not (Test-Path -LiteralPath $setup)) { throw "INSTALLER_MISSING=$setup" }
-          if (-not (Test-Path -LiteralPath $portable)) { throw "PORTABLE_MISSING=$portable" }
-
-          $withdrawnSetup = Join-Path $PWD 'dist\TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full-Setup.exe'
-          $withdrawnPortable = Join-Path $PWD 'dist\TNSuiteBridgeX_260818_v0.5-Build12-Hotfix16-Full.zip'
-          if ((Test-Path -LiteralPath $withdrawnSetup) -or (Test-Path -LiteralPath $withdrawnPortable)) {
-            throw 'WITHDRAWN_HOTFIX16_ARTIFACT_RECREATED'
-          }
-
-          $setupVersion = (Get-Item -LiteralPath $setup).VersionInfo.FileVersion
-          if ($setupVersion -ne '0.5.12.17') {
-            throw "INSTALLER_FILE_VERSION_MISMATCH=$setupVersion"
-          }
-          Write-Host 'INSTALLER_FILE_VERSION_QA=PASS version=0.5.12.17'
-
-          Copy-Item -LiteralPath $setup -Destination $assets
-          Copy-Item -LiteralPath $portable -Destination $assets
-
-          $setupName = Split-Path -Leaf $setup
-          $portableName = Split-Path -Leaf $portable
-          $setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assets $setupName)).Hash.ToLowerInvariant()
-          $portableHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assets $portableName)).Hash.ToLowerInvariant()
-          $sumText = "$setupHash *$setupName`n$portableHash *$portableName`n"
-          [System.IO.File]::WriteAllText((Join-Path $assets 'SHA256SUMS.txt'), $sumText, [System.Text.Encoding]::ASCII)
-
-          Write-Host "INSTALLER_SHA256=$setupHash"
-          Write-Host "PORTABLE_SHA256=$portableHash"
+          $assets=Join-Path $PWD 'release-assets'
+          New-Item -ItemType Directory -Path $assets -Force | Out-Null
+          $setup=Join-Path $PWD 'dist-hf25-source\TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX-Setup.exe'
+          $msi=Join-Path $PWD 'dist-hf25-source\TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX.msi'
+          $portable=Join-Path $PWD "dist\$env:BUILD16_NAME.zip"
+          foreach($f in @($setup,$msi,$portable)){if(-not (Test-Path -LiteralPath $f)){throw "RELEASE_INPUT_MISSING=$f"}}
+          $outSetup=Join-Path $assets "$env:BUILD_NAME-Setup.exe"
+          $outPortable=Join-Path $assets "$env:BUILD_NAME.zip"
+          Copy-Item -LiteralPath $setup -Destination $outSetup
+          Copy-Item -LiteralPath $portable -Destination $outPortable
+          $shaSetup=(Get-FileHash -Algorithm SHA256 $outSetup).Hash.ToLowerInvariant()
+          $shaPortable=(Get-FileHash -Algorithm SHA256 $outPortable).Hash.ToLowerInvariant()
+          $shaMsi=(Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
+          $shaSource=$env:BRIDGEX_SOURCE_SHA
+          if($shaSource -notmatch '^[0-9a-f]{40}$'){throw 'SOURCE_SHA_INVALID'}
+          $sums="$shaSetup *$(Split-Path $outSetup -Leaf)"+[Environment]::NewLine+"$shaPortable *$(Split-Path $outPortable -Leaf)"+[Environment]::NewLine
+          [IO.File]::WriteAllText((Join-Path $assets 'SHA256SUMS.txt'),$sums,[Text.Encoding]::ASCII)
+          $proof=@(
+            'ARTIFACT_CLASS=UNSIGNED_MANUAL_DOWNLOAD_CANDIDATE'
+            'PUBLISH_AUTHORITY=NONE_BUILD_ONLY'
+            "SOURCE_SHA=$shaSource"
+            "RUNTIME_EXE_SHA256=$env:BRIDGEX_RUNTIME_SHA256"
+            "PORTABLE_ZIP_SHA256=$shaPortable"
+            "MSI_SHA256=$shaMsi"
+            "SETUP_EXE_SHA256=$shaSetup"
+            'SOURCE_RUNTIME_MSI_SETUP_CHAIN_QA=PASS'
+            'WINDOWS_E2E=PASS'
+            'AUTHENTICODE_SIGNING=NOT_CONFIGURED_UNSIGNED'
+            'AUTO_UPDATE=DISABLED'
+          )
+          [IO.File]::WriteAllLines((Join-Path $assets 'SOURCE_BUILD_MANIFEST.txt'),$proof,[Text.Encoding]::UTF8)
+          Write-Host "INSTALLER_SHA256=$shaSetup"
+          Write-Host "PORTABLE_SHA256=$shaPortable"
           Write-Host 'RELEASE_ASSET_SHA256=PASS'
 
       - name: Write release notes
-        if: steps.plan.outputs.build == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $hashLines = Get-Content 'release-assets/SHA256SUMS.txt'
-          if ($hashLines.Count -ne 2) { throw "SHA256_LINE_COUNT_INVALID=$($hashLines.Count)" }
-
-          $notesLines = @(
-            '# TNSuite BridgeX v0.5 Build12-Hotfix17',
+          $hashLines=@(Get-Content 'release-assets/SHA256SUMS.txt')
+          if($hashLines.Count -ne 2){throw 'SHA256_LINE_COUNT_INVALID'}
+          $lines=@(
+            '# TNSuite BridgeX v0.5 Build12 Hotfix25 — RC2',
             '',
-            '**File transfer quen thuộc như FileZilla, nhưng có Dark Mode.**',
+            '**Bản thử nghiệm (pre-release), tải và cài đặt thủ công trên Windows x64.**',
             '',
-            'Build12-Hotfix17 là bản sửa lỗi đóng gói installer sau khi Build12-Hotfix16 bị thu hồi. Artifact ở bước này chỉ là bằng chứng build và chưa được phát hành công khai.',
+            '## Cảnh báo: Không có chữ ký số',
+            'Bản phát hành chưa ký Authenticode (Unsigned). Windows có thể hiển thị Unknown Publisher hoặc SmartScreen. Không tắt Defender; kiểm tra đúng nguồn tải và SHA-256.',
+            'Không triển khai Auto Update trong kênh này.',
             '',
-            '## Tệp build',
+            '## Tải xuống',
+            "- Installer: $env:BUILD_NAME-Setup.exe",
+            "- Portable: $env:BUILD_NAME.zip",
+            '- Checksum: SHA256SUMS.txt',
             '',
-            "- **Installer:** $env:BUILD_NAME-Setup.exe",
-            "- **Portable:** $env:BUILD_NAME.zip",
-            '- **Checksum:** SHA256SUMS.txt',
-            '',
-            '## Có gì trong bản này',
-            '',
-            '- Dark Mode / Light Mode;',
-            '- ghi nhớ giao diện đã chọn;',
-            '- English / Tiếng Việt;',
-            '- SFTP / truyền tệp;',
-            '- Windows installer và portable build;',
-            '- CLI automation/SFTP có phạm vi giới hạn;',
-            '- installer không còn nhúng/chạy PowerShell helper hoặc tự động terminate BridgeX;',
-            '- installer dùng NSIS zlib thay cho solid LZMA.',
+            '## Có gì mới',
+            '- WiX Toolset 6 / Burn + MSI thay thế NSIS trong dòng Hotfix25.',
+            '- Khắc phục installer yêu cầu khởi động lại khi BridgeX đang chạy.',
+            '- Đã kiểm tra fresh install, upgrade, repair, uninstall và icon/taskbar.',
+            '- Duy trì Light/Dark, English/Tiếng Việt và SFTP.',
             '',
             '## SHA-256',
             ''
           )
-          foreach ($line in $hashLines) {
-            $notesLines += "    $line"
-          }
-          $notesLines += ''
-          $notesLines += '**VirusTotal:** chờ kiểm tra lại đúng artifact từ protected main trước khi phát hành.'
-          $notesLines += ''
-          $notesLines += "**Source:** $env:BRIDGEX_SOURCE_SHA"
-          $notesLines += ''
-          $notesLines += '> BridgeX được phát triển độc lập từ FileZilla Client 3.70.6. Đây không phải sản phẩm chính thức của FileZilla Project.'
-
-          $notes = [string]::Join("`n", $notesLines) + "`n"
-          [System.IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), $notes, [System.Text.UTF8Encoding]::new($false))
+          foreach($line in $hashLines){$lines+="    $line"}
+          $lines+=''
+          $lines+='VirusTotal: Chỉ công bố kết quả khi có bằng chứng cho đúng hash artifact canonical-main.'
+          $lines+=''
+          $lines+="Source: $env:BRIDGEX_SOURCE_SHA"
+          $lines+=''
+          $lines+='BridgeX phát triển độc lập từ FileZilla Client 3.70.6, không phải sản phẩm chính thức của FileZilla Project.'
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'),([string]::Join([Environment]::NewLine,$lines)+[Environment]::NewLine),[Text.UTF8Encoding]::new($false))
           Write-Host 'RELEASE_NOTES_RENDER_QA=PASS'
 
       - name: Upload governed build evidence artifact
