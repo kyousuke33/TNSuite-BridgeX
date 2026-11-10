@@ -1,5 +1,8 @@
 # Changelog
 
+## Build12 Hotfix25 — runtime version identity fix (QA-only)
+- Fix About and Welcome displaying stale `Build12-Hotfix16` while the source-built Hotfix25 runtime is installed. Introduce a fail-closed disposable-source runtime overlay, preserving the historical pinned baseline; gate exact About/Welcome `Build12-Hotfix25` identity before Windows packaging. Previous QA Setup/EXE hashes remain valid as historical evidence only.
+
 ## Build12 Hotfix25 manual unsigned release workflow (not yet published)
 - Align the existing protected-main Windows build and promotion flow from obsolete Hotfix17 NSIS to source-built Hotfix25 WiX/Burn, using the same disposable Hotfix24 source preparation as native installer QA.
 - Generate immutable Setup + portable + SHA256SUMS + SHA source/runtime/MSI/Setup manifest, validated by real Windows fresh/upgrade/repair/uninstall E2E.

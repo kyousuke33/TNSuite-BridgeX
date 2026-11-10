@@ -136,6 +136,8 @@ jobs:
           if(-not (Test-Path -LiteralPath $exe)){throw 'SOURCE_RUNTIME_EXE_MISSING'}
           if(-not (Test-Path -LiteralPath $icon)){throw 'SOURCE_RUNTIME_ICON_MISSING'}
           if((Get-FileHash -Algorithm SHA256 $icon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256){throw 'SOURCE_RUNTIME_ICON_HASH_FAIL'}
+          & python.exe .\qa\verify_hotfix25_runtime_binary.py $exe
+          if($LASTEXITCODE -ne 0){throw 'HF25_RELEASE_COMPILED_ABOUT_VERSION_FAIL'}
           $sha=(Get-FileHash -Algorithm SHA256 $exe).Hash.ToLowerInvariant()
           if($sha -notmatch '^[a-f0-9]{64}$'){throw 'SOURCE_RUNTIME_SHA256_INVALID'}
           [IO.File]::AppendAllText($env:GITHUB_ENV,"BRIDGEX_RUNTIME_SHA256=$sha"+[Environment]::NewLine,[Text.UTF8Encoding]::new($false))

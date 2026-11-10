@@ -26,7 +26,7 @@ if (-not $build.Contains($brandingOld.Trim())) { throw 'HF24_BRANDING_CONTRACT_A
 $build = $build.Replace($brandingOld.Trim(), $brandingNew.Trim())
 
 $patchNeedle = 'python "$KIT/scripts/patch_tnsuite_bridgex.py" "$SRC"'
-$patchReplacement = $patchNeedle + "`n" + 'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"'
+$patchReplacement = $patchNeedle + "`n" + 'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix24.py" "$SRC"' + "`n" + 'python "$KIT/scripts/patch_tnsuite_bridgex_hotfix25_version.py" "$SRC"'
 if (-not $build.Contains($patchNeedle)) { throw 'HF24_RUNTIME_PATCH_HOOK_ANCHOR_MISSING' }
 $build = $build.Replace($patchNeedle, $patchReplacement)
 

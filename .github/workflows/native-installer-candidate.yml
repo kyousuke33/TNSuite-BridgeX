@@ -655,6 +655,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $runtimeExe)) { throw 'HF24_PORTABLE_RUNTIME_MISSING' }
           if (-not (Test-Path -LiteralPath $runtimeIcon)) { throw 'HF24_PORTABLE_ICON_MISSING' }
           if ((Get-FileHash -Algorithm SHA256 $runtimeIcon).Hash.ToLowerInvariant() -ne $env:ICON_SHA256) { throw 'HF24_PORTABLE_ICON_HASH_FAIL' }
+          & python.exe .\qa\verify_hotfix25_runtime_binary.py $runtimeExe
+          if ($LASTEXITCODE -ne 0) { throw 'HF25_NATIVE_COMPILED_ABOUT_VERSION_FAIL' }
 
           # The native source build is not bit-reproducible across independent CI
           # runs. Capture the exact runtime SHA here, before packaging, and pass it
