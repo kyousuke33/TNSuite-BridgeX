@@ -40,7 +40,7 @@ jobs:
           if ($request.schema -ne 'tnsuite.bridgex.release-request.v1') { throw 'RELEASE_REQUEST_SCHEMA_INVALID' }
           if ($request.channel -ne 'github-releases') { throw 'RELEASE_CHANNEL_INVALID' }
           if ($request.tag -ne 'v0.5.0-build12-hotfix25-rc2') { throw 'RELEASE_TAG_INVALID' }
-          if ($request.build_name -ne 'TNSuiteBridgeX_260820_v0.5.0-build12-hotfix25-rc2-Full') { throw 'BUILD_NAME_INVALID' }
+          if ($request.build_name -ne 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX') { throw 'BUILD_NAME_INVALID' }
           if ($request.rcp_profile -ne 'tnsuite.public-desktop-github-release.v1') { throw 'RCP_RELEASE_PROFILE_INVALID' }
           if ($request.rcp_authority_sha -notmatch '^[0-9a-f]{40}$') { throw 'RCP_AUTHORITY_SHA_INVALID' }
           if ($request.manual_download_only -ne $true -or $request.authenticode_required -ne $false -or $request.auto_update_enabled -ne $false -or $request.release_status -ne 'prerelease') {

@@ -86,7 +86,7 @@ jobs:
 
           [[ "$request_tag" == 'v0.5.0-build12-hotfix25-rc2' ]] || { echo "PROMOTION_TAG=FAIL actual=$request_tag"; exit 42; }
           [[ "$request_title" == 'TNSuite BridgeX v0.5 Build12 Hotfix25 — RC2 (Unsigned)' ]] || { echo 'PROMOTION_TITLE=FAIL'; exit 42; }
-          [[ "$request_build" == 'TNSuiteBridgeX_260820_v0.5.0-build12-hotfix25-rc2-Full' ]] || { echo 'PROMOTION_BUILD_NAME=FAIL'; exit 42; }
+          [[ "$request_build" == 'TNSuiteBridgeX_260822_v0.5-Build12-Hotfix25-WiX' ]] || { echo 'PROMOTION_BUILD_NAME=FAIL'; exit 42; }
           [[ "$request_profile" == 'tnsuite.public-desktop-github-release.v1' ]] || { echo 'PROMOTION_RCP_PROFILE=FAIL'; exit 42; }
           [[ "$request_authority" =~ ^[0-9a-f]{40}$ ]] || { echo 'PROMOTION_RCP_AUTHORITY=FAIL'; exit 42; }
           [[ "$(jq -r '.manual_download_only' .release/release-request.json)" == 'true' ]] || { echo 'MANUAL_RELEASE_REQUIRED=FAIL'; exit 42; }
