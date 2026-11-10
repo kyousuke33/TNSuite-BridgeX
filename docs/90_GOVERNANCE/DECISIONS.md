@@ -116,6 +116,20 @@ This lock exists specifically to stop an indefinite Hotfix loop without a define
 
 Production-grade secure auto-update must not be implemented ahead of the publisher/signing, artifact-trust and governed-distribution foundation. Signing secrets must never be exposed to public PR CI.
 
+### SIGNING-002 — Owner opts out of paid Authenticode for BridgeX
+**Status:** LOCKED — OWNER DECISION 2026-11-10
+
+The Owner will not purchase a commercial code-signing certificate, paid remote-signing service, or recurring signing subscription, now or in future. Agents must not reopen procurement as a release blocker absent an explicit Owner policy reversal. RCP #230 remains closed, no active provider/binding; it must not be represented as configured.
+
+For **manual download only**, unsigned BridgeX Windows ZIP/EXE/MSI is an acceptable *distribution format* subject to all remaining release gates. Do not label an unsigned file trusted/signed, do not create a self-signed "Verified Publisher", suppress SmartScreen/Defender prompts, or claim SHA-256 establishes publisher identity. Public release notes/download UI must clearly disclose that Windows may show "Unknown Publisher" or a SmartScreen warning.
+
+An unsigned manual-download format is not by itself permission to publish. Exact canonical-main source, Windows QA, immutable artifact checksums, applicable exact-hash AV, Owner acceptance and governed release authority remain mandatory.
+
+### SIGNING-003 — Automatic update stays outside the unsigned manual channel
+**Status:** LOCKED
+
+Manual download via the approved GitHub Releases/Portal links must be separated from unattended execution, automatic installation and desktop auto-update. Under `SIGNING-001` no production-grade automatic updater may be enabled without an independently accepted trusted-update mechanism. Do not mistake the decision not to buy Authenticode for permission to weaken artifact/update verification. Any alternative must be separately reviewed and explicitly approved.
+
 ### ROADMAP-001 — No phase drift
 **Status:** LOCKED
 

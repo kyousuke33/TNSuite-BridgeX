@@ -1,5 +1,10 @@
 # Changelog
 
+## Owner release-channel decision — 2026-11-10 (documentation only)
+- Build12 manual download may use an **unsigned** WiX/MSI/portable artifact after exact-main release gates and Owner acceptance. The Owner will not purchase paid Authenticode services; no signing bypass, SmartScreen suppression or automatic updater is authorized.
+- Record current release pipeline mismatch: `.github/workflows/windows-release.yml` still builds legacy Hotfix17/NSIS and is **not** eligible to publish accepted Hotfix25/WiX bytes. It must be aligned and reverified before any manual release publication.
+- PR #54 source-built Hotfix25 QA was Windows E2E PASS on exact head `7cc8753da3e89d7a769953ea74cc6601f91b46ab`; canonical-main RC and exact final AV/UAT are separate.
+
 ## Unreleased — Build12 Hotfix25 no-reboot installer regression (QA-only, not released)
 - QA hash-chain manifest state is replaced exactly once only after Windows E2E PASS; regex marker counting avoids PowerShell String.Split(char[]) semantics (verified incorrect on OFFICE).
 - Fix P0.E PR provenance discrepancy: GitHub pull_request default actions/checkout used synthetic merge SHA instead of exact PR head. Pin all native installer jobs to the actual PR head. The source-built Hotfix24 job now builds and validates a Hotfix25 QA installer from that same compiled portable, records exact source/portable/runtime/MSI/Setup SHA256, runs real no-reboot Windows E2E, and uploads only test-class candidate evidence. This does not authorize merging, Authenticode signing, Stable, or published release.
