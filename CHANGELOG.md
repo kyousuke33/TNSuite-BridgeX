@@ -1,5 +1,11 @@
 # Changelog
 
+## Build12 Hotfix25 manual unsigned release workflow (not yet published)
+- Align the existing protected-main Windows build and promotion flow from obsolete Hotfix17 NSIS to source-built Hotfix25 WiX/Burn, using the same disposable Hotfix24 source preparation as native installer QA.
+- Generate immutable Setup + portable + SHA256SUMS + SHA source/runtime/MSI/Setup manifest, validated by real Windows fresh/upgrade/repair/uninstall E2E.
+- Reserve the next Hotfix25 RC2 prerelease identity without altering RC1; no Stable release, automatic publication or Auto Update is authorized.
+- Release promotion remains separately gated by exact protected-main source/build, accepted multi-engine AV evidence and Owner release/UAT acceptance.
+
 ## Owner release-channel decision — 2026-11-10 (documentation only)
 - Build12 manual download may use an **unsigned** WiX/MSI/portable artifact after exact-main release gates and Owner acceptance. The Owner will not purchase paid Authenticode services; no signing bypass, SmartScreen suppression or automatic updater is authorized.
 - Record current release pipeline mismatch: `.github/workflows/windows-release.yml` still builds legacy Hotfix17/NSIS and is **not** eligible to publish accepted Hotfix25/WiX bytes. It must be aligned and reverified before any manual release publication.
